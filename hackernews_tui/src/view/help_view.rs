@@ -187,6 +187,10 @@ fn default_other_commands() -> Vec<Command> {
             global_keymap.open_help_dialog.to_string(),
             "Open the help dialog",
         ),
+        Command::new(
+            global_keymap.open_my_threads_in_browser.to_string(),
+            "Open your comments on Hacker News in browser (requires authentication)",
+        ),
         Command::new(global_keymap.quit.to_string(), "Quit the application"),
         Command::new(global_keymap.close_dialog.to_string(), "Close a dialog"),
     ]

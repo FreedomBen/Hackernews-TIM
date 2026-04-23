@@ -152,19 +152,20 @@ For more information about configuring the application's key mappings or definin
 
 ### Global shortcuts
 
-| Command                 | Description                             | Default Shortcut   |
-| ----------------------- | --------------------------------------- | ------------------ |
-| `open_help_dialog`      | Open the help dialog                    | `?`                |
-| `open_login_dialog`     | Open the Hacker News login dialog       | `L`                |
-| `close_dialog`          | Close a dialog                          | `esc`              |
-| `quit`                  | Quit the application                    | `[q, C-c]`         |
-| `goto_previous_view`    | Go to the previous view                 | `[backspace, C-p]` |
-| `goto_search_view`      | Go to search view                       | `[/, C-s]`         |
-| `goto_front_page_view`  | Go to front page view                   | `F1`               |
-| `goto_all_stories_view` | Go to all stories view                  | `F2`               |
-| `goto_ask_hn_view`      | Go to ask HN view                       | `F3`               |
-| `goto_show_hn_view`     | Go to show HN view                      | `F4`               |
-| `goto_jobs_view`        | Go to jobs view                         | `F5`               |
+| Command                      | Description                                                  | Default Shortcut   |
+| ---------------------------- | ------------------------------------------------------------ | ------------------ |
+| `open_help_dialog`           | Open the help dialog                                         | `?`                |
+| `open_login_dialog`          | Open the Hacker News login dialog                            | `L`                |
+| `open_my_threads_in_browser` | Open your comments on Hacker News in browser (auth required) | `T`                |
+| `close_dialog`               | Close a dialog                                               | `esc`              |
+| `quit`                       | Quit the application                                         | `[q, C-c]`         |
+| `goto_previous_view`         | Go to the previous view                                      | `[backspace, C-p]` |
+| `goto_search_view`           | Go to search view                                            | `[/, C-s]`         |
+| `goto_front_page_view`       | Go to front page view                                        | `F1`               |
+| `goto_all_stories_view`      | Go to all stories view                                       | `F2`               |
+| `goto_ask_hn_view`           | Go to ask HN view                                            | `F3`               |
+| `goto_show_hn_view`          | Go to show HN view                                           | `F4`               |
+| `goto_jobs_view`             | Go to jobs view                                              | `F5`               |
 
 ### Edit shortcuts
 

@@ -92,6 +92,7 @@ impl Default for ScrollKeyMap {
 pub struct GlobalKeyMap {
     pub open_help_dialog: Keys,
     pub open_login_dialog: Keys,
+    pub open_my_threads_in_browser: Keys,
     pub quit: Keys,
     pub close_dialog: Keys,
 
@@ -110,6 +111,7 @@ impl Default for GlobalKeyMap {
         GlobalKeyMap {
             open_help_dialog: Keys::new(vec!['?'.into()]),
             open_login_dialog: Keys::new(vec!['L'.into()]),
+            open_my_threads_in_browser: Keys::new(vec!['T'.into()]),
             quit: Keys::new(vec!['q'.into(), event::Event::CtrlChar('c')]),
             close_dialog: Keys::new(vec![event::Key::Esc.into()]),
 

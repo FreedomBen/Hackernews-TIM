@@ -117,6 +117,25 @@ fn set_up_global_callbacks(
         s.add_layer(login_dialog::get_login_dialog(client, auth_file.clone()));
     });
 
+    s.set_on_post_event(
+        global_keymap.open_my_threads_in_browser,
+        |s| match client::get_user_info() {
+            Some(info) => {
+                let url = format!("{}/threads?id={}", client::HN_HOST_URL, info.username);
+                utils::open_url_in_browser(&url);
+            }
+            None => {
+                s.add_layer(
+                    Dialog::info(
+                        "Log in first (press `L`) to view your comments on \
+                         Hacker News.",
+                    )
+                    .title("Not logged in"),
+                );
+            }
+        },
+    );
+
     s.set_on_post_event(global_keymap.quit, |s| s.quit());
 }
 

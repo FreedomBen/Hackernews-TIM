@@ -374,7 +374,7 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
         // Reply to the focused item. Stashes the request into Cursive
         // user data and quits; `main::run`'s outer loop reads it, spawns
         // `$EDITOR`, then re-enters the TUI.
-        .on_pre_event_inner(Event::Char('r'), |s, _| {
+        .on_pre_event_inner(comment_view_keymap.reply.clone(), |s, _| {
             let id = s.get_focus_index();
             let parent_id = s.items[id].id;
             let parent_content = s.items[id].plain_text();

@@ -240,6 +240,7 @@ For more information about configuring the application's key mappings or definin
 | `toggle_collapse_comment`      | Toggle collapsing the focused item                                              | `tab`            |
 | `upvote`                       | Toggle upvoting the focused item (**requires [authentication](#authentication)**) | `v`              |
 | `downvote`                     | Toggle downvoting the focused item (**requires downvote privilege**)            | `V`              |
+| `reply`                        | Reply to the focused item in `$EDITOR` (**requires [authentication](#authentication)**) | `r`        |
 | `open_article_in_browser`      | Open in browser the discussed article                                           | `a`              |
 | `open_article_in_article_view` | Open in article view the discussed article                                      | `A`              |
 | `open_story_in_browser`        | Open in browser the discussed story                                             | `s`              |

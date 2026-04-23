@@ -1097,7 +1097,7 @@ pub fn verify_credentials(username: &str, password: &str) -> Result<Option<Strin
 #[cfg(test)]
 mod tests {
     use super::{
-        classify_login_response, listing_path_for_tag, parse_karma_from_profile,
+        classify_login_response, listing_path_for_tag, parse_karma_from_profile, parse_reply_form,
         parse_topcolor_from_profile, parse_vote_data_from_content, StartupLoginStatus,
     };
     use crate::model::VoteDirection;
@@ -1314,5 +1314,26 @@ mod tests {
     fn returns_none_when_karma_not_a_number() {
         let html = r#"<tr><td>karma:</td><td>abc</td></tr>"#;
         assert_eq!(parse_karma_from_profile(html), None);
+    }
+
+    // Captured from a real /reply?id=X response. If HN ever drifts its
+    // form markup this regression trips; refresh the fixture rather than
+    // loosening the assertion.
+    const REPLY_FORM_HTML: &str = include_str!("../../tests/fixtures/reply_form.html");
+
+    #[test]
+    fn parse_reply_form_extracts_hmac_from_real_sample() {
+        let hmac = parse_reply_form(REPLY_FORM_HTML)
+            .expect("hmac should be present in the captured reply form");
+        assert!(!hmac.is_empty());
+        assert!(
+            hmac.chars().all(|c| c.is_ascii_hexdigit()),
+            "hmac should be lowercase hex; got {hmac:?}"
+        );
+    }
+
+    #[test]
+    fn parse_reply_form_returns_none_without_hmac() {
+        assert!(parse_reply_form("<html><body>no form here</body></html>").is_none());
     }
 }

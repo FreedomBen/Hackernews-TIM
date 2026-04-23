@@ -798,10 +798,12 @@ fn parse_vote_data_from_content(page_content: &str) -> Result<HashMap<String, Vo
 
 /// Extract the `topcolor` value from the HTML of a HN user's profile page.
 ///
-/// The edit form on `news.ycombinator.com/user?id=<self>` contains an
-/// `<input name="topcolor" value="ff6600">` (attribute order and quoting
-/// vary). This parses any near-by 6-char hex value bound to the `topcolor`
-/// input in either order, case-insensitively.
+/// The edit form on `news.ycombinator.com/user?id=<self>` renders the
+/// preference as a labelled row: `<td>topcolor:</td><td><input type="text"
+/// name="topc" value="ff6600" size="20"></td>`. Note HN shortens the form
+/// input's `name` to `topc` — only the user-facing label cell spells it out
+/// in full. Anchoring on the label text rather than the short input name
+/// keeps the match tied to something visible on the page.
 /// Extract the `karma` value from the HTML of a HN user's profile page.
 ///
 /// HN renders karma in a two-cell table row: `<td>karma:</td><td>123</td>`.
@@ -816,21 +818,17 @@ fn parse_karma_from_profile(html: &str) -> Option<u32> {
 }
 
 fn parse_topcolor_from_profile(html: &str) -> Option<String> {
-    // Match `name="topcolor" value="XXXXXX"` and the reverse attribute order.
-    // Quotes are optional to tolerate HN's minimal-HTML quirks.
-    let rg = regex::Regex::new(concat!(
-        r#"(?i)"#,
-        r#"(?:"#,
-        r#"name=["']?topcolor["']?[^>]*?value=["']?([0-9a-f]{6})["']?"#,
-        r#"|"#,
-        r#"value=["']?([0-9a-f]{6})["']?[^>]*?name=["']?topcolor["']?"#,
-        r#")"#,
-    ))
+    // Anchor on the visible `topcolor:` label cell, then capture the 6-char
+    // hex value of the `<input>` in the following cell. Quoting is optional
+    // to tolerate HN's minimal-HTML quirks. Don't key off the input's `name`
+    // attribute — HN shortens it to `topc`, which is easy to mistake for a
+    // typo and easy for HN to change without warning.
+    let rg = regex::Regex::new(
+        r#"(?is)topcolor:\s*</td>\s*<td[^>]*>\s*<input\b[^>]*?\bvalue=["']?([0-9a-f]{6})["']?"#,
+    )
     .ok()?;
     let cap = rg.captures(html)?;
-    cap.get(1)
-        .or_else(|| cap.get(2))
-        .map(|m| m.as_str().to_ascii_lowercase())
+    Some(cap.get(1)?.as_str().to_ascii_lowercase())
 }
 
 /// Record the logged-in user's display info for views to read later.
@@ -991,26 +989,23 @@ mod tests {
     }
 
     #[test]
-    fn extracts_default_topcolor_when_attributes_quoted() {
-        let html = r#"<tr><td>topcolor:</td><td><input type=text name="topcolor" size=6 value="ff6600"></td></tr>"#;
-        assert_eq!(parse_topcolor_from_profile(html).as_deref(), Some("ff6600"));
+    fn extracts_topcolor_from_real_hn_profile_shape() {
+        // Literal slice of `news.ycombinator.com/user?id=<self>` — the input
+        // name is `topc`, not `topcolor`. Only the preceding label cell
+        // spells the word out in full.
+        let html = r#"<tr><td valign="top">topcolor:</td><td><input type="text" name="topc" value="33cc33" size="20"></td></tr>"#;
+        assert_eq!(parse_topcolor_from_profile(html).as_deref(), Some("33cc33"));
     }
 
     #[test]
-    fn extracts_custom_topcolor_without_quotes() {
-        let html = "<input type=text name=topcolor size=6 value=336699>";
+    fn extracts_topcolor_without_quotes() {
+        let html = "<td>topcolor:</td><td><input type=text name=topc size=20 value=336699></td>";
         assert_eq!(parse_topcolor_from_profile(html).as_deref(), Some("336699"));
     }
 
     #[test]
-    fn tolerates_reversed_attribute_order() {
-        let html = r#"<input value="abcdef" name="topcolor">"#;
-        assert_eq!(parse_topcolor_from_profile(html).as_deref(), Some("abcdef"));
-    }
-
-    #[test]
     fn normalises_uppercase_to_lowercase() {
-        let html = r#"<input name="topcolor" value="FF6600">"#;
+        let html = r#"<td>topcolor:</td><td><input name="topc" value="FF6600"></td>"#;
         assert_eq!(parse_topcolor_from_profile(html).as_deref(), Some("ff6600"));
     }
 
@@ -1023,7 +1018,7 @@ mod tests {
 
     #[test]
     fn returns_none_when_value_is_malformed() {
-        let html = r#"<input name="topcolor" value="not-a-color">"#;
+        let html = r#"<td>topcolor:</td><td><input name="topc" value="not-a-color"></td>"#;
         assert_eq!(parse_topcolor_from_profile(html), None);
     }
 

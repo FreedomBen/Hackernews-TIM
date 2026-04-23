@@ -38,7 +38,7 @@ mod tests {
     #[test]
     fn option_test_none_to_none() {
         let mut value = D { d1: None };
-        let toml = "".parse::<toml::Value>().unwrap();
+        let toml = toml::from_str::<toml::Value>("").unwrap();
         let expected_value = D { d1: None };
 
         value.parse(toml).unwrap();
@@ -48,12 +48,13 @@ mod tests {
     #[test]
     fn option_test_none_to_some() {
         let mut value = D { d1: None };
-        let toml = "
+        let toml = toml::from_str::<toml::Value>(
+            "
 [d1]
 b1 = 'd1.b1'
 b2 = 'd1.b2'
-"
-        .parse::<toml::Value>()
+",
+        )
         .unwrap();
         let expected_value = D {
             d1: Some(B {
@@ -74,7 +75,7 @@ b2 = 'd1.b2'
                 b2: "d1.b2".to_owned(),
             }),
         };
-        let toml = "".parse::<toml::Value>().unwrap();
+        let toml = toml::from_str::<toml::Value>("").unwrap();
         let expected_value = D {
             d1: Some(B {
                 b1: "d1.b1".to_owned(),
@@ -94,12 +95,13 @@ b2 = 'd1.b2'
                 b2: "d1.b2".to_owned(),
             }),
         };
-        let toml = "
+        let toml = toml::from_str::<toml::Value>(
+            "
 [d1]
 b1 = 'd1.b1_new'
 b2 = 'd1.b2_new'
-"
-        .parse::<toml::Value>()
+",
+        )
         .unwrap();
         let expected_value = D {
             d1: Some(B {
@@ -114,7 +116,7 @@ b2 = 'd1.b2_new'
 
     #[test]
     fn simple_test() {
-        let value = "a = ['b', 'c', 'd']".parse::<toml::Value>().unwrap();
+        let value = toml::from_str::<toml::Value>("a = ['b', 'c', 'd']").unwrap();
         let mut a: Vec<String> = vec![];
         a.parse(value["a"].clone()).unwrap();
         assert!(a.len() == 3);
@@ -140,7 +142,8 @@ b2 = 'd1.b2_new'
             },
         };
 
-        let toml = "
+        let toml = toml::from_str::<toml::Value>(
+            "
 a1 = 'a1_new'
 a2 = 150
 
@@ -157,8 +160,8 @@ b2 = 'a5.c1.b2_new'
 [a5]
 c2 = false
 c3 = true
-"
-        .parse::<toml::Value>()
+",
+        )
         .unwrap();
 
         let expected_value = A {

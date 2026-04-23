@@ -14,9 +14,14 @@ const DEFAULT_LOG_FILE: &str = "hn-tui.log";
 use clap::*;
 use prelude::*;
 
-fn run(client: &'static client::HNClient, start_id: Option<u32>, auth_file: std::path::PathBuf) {
+fn run(
+    client: &'static client::HNClient,
+    start_id: Option<u32>,
+    auth_file: std::path::PathBuf,
+    login_status: client::StartupLoginStatus,
+) {
     // setup the application's UI
-    let s = view::init_ui(client, start_id, auth_file);
+    let s = view::init_ui(client, start_id, auth_file, login_status);
 
     // use `cursive_buffered_backend` crate to fix the flickering issue
     // when using `cursive` with `crossterm_backend` (See https://github.com/gyscos/Cursive/issues/142)
@@ -208,11 +213,11 @@ fn build_client_and_log_in(
     config: &config::Config,
     auth: &Option<config::Auth>,
     auth_path: &std::path::Path,
-) -> (client::HNClient, bool) {
+) -> (client::HNClient, bool, client::StartupLoginStatus) {
     let Some(auth) = auth else {
         let client = client::HNClient::with_timeout(config.client_timeout)
             .expect("failed to build HN client");
-        return (client, false);
+        return (client, false, client::StartupLoginStatus::NotAttempted);
     };
 
     if let Some(session) = auth.session.as_deref().filter(|s| !s.is_empty()) {
@@ -222,7 +227,7 @@ fn build_client_and_log_in(
                     "Restored HN session for {} from cached cookie",
                     auth.username
                 );
-                return (client, true);
+                return (client, true, client::StartupLoginStatus::NotAttempted);
             }
             Ok(_) => {
                 tracing::info!(
@@ -245,11 +250,18 @@ fn build_client_and_log_in(
             if updated.session != auth.session {
                 save_auth(auth_path, &updated);
             }
-            (client, true)
+            (
+                client,
+                true,
+                client::StartupLoginStatus::Success {
+                    username: auth.username.clone(),
+                },
+            )
         }
         Err(err) => {
             tracing::warn!("Failed to login, user={}: {err}", auth.username);
-            (client, false)
+            let status = client::StartupLoginStatus::from_login_error(&err);
+            (client, false, status)
         }
     }
 }
@@ -336,7 +348,7 @@ fn main() {
     // repeated `/login` POSTs from the same IP with a CAPTCHA, and the TUI
     // can't solve it. We only fall back to the password when no cached
     // session exists or the cached one has expired.
-    let (hn_client, logged_in) = build_client_and_log_in(&config, &auth, &auth_path);
+    let (hn_client, logged_in, login_status) = build_client_and_log_in(&config, &auth, &auth_path);
 
     let mut user_info: Option<client::UserInfo> = None;
     if let Some(auth) = &auth {
@@ -361,5 +373,5 @@ fn main() {
     let client = client::install_client(hn_client);
 
     let start_id = args.get_one::<u32>("start_id").cloned();
-    run(client, start_id, auth_path);
+    run(client, start_id, auth_path, login_status);
 }

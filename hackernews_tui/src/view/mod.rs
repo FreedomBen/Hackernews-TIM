@@ -120,11 +120,47 @@ fn set_up_global_callbacks(
     s.set_on_post_event(global_keymap.quit, |s| s.quit());
 }
 
+/// Build a dialog summarising a startup password-login attempt, or `None`
+/// when there's nothing worth interrupting the user with (no login was
+/// attempted, or a cached session restored seamlessly).
+fn build_login_status_dialog(status: client::StartupLoginStatus) -> Option<Dialog> {
+    use client::StartupLoginStatus;
+    let (title, body) = match status {
+        StartupLoginStatus::NotAttempted => return None,
+        StartupLoginStatus::Success { username } => (
+            "Login successful",
+            format!(
+                "Logged in to Hacker News as {username}. A fresh session \
+                 cookie was saved to your auth file."
+            ),
+        ),
+        StartupLoginStatus::BadLogin => (
+            "Login failed",
+            "Hacker News rejected the stored credentials (`Bad login.`). \
+             Update `username`/`password` in hn-auth.toml and restart."
+                .to_string(),
+        ),
+        StartupLoginStatus::Captcha => (
+            "CAPTCHA required",
+            "Hacker News asked for a CAPTCHA before letting us log in, and \
+             the TUI can't solve it. Sign in at https://news.ycombinator.com/ \
+             in a browser, copy the `user` cookie from DevTools, and paste \
+             its value into the `session = \"\"` line in hn-auth.toml."
+                .to_string(),
+        ),
+        StartupLoginStatus::Other(msg) => {
+            ("Login failed", format!("Hacker News login failed: {msg}"))
+        }
+    };
+    Some(Dialog::info(body).title(title))
+}
+
 /// Initialize the application's UI
 pub fn init_ui(
     client: &'static client::HNClient,
     start_id: Option<u32>,
     auth_file: std::path::PathBuf,
+    login_status: client::StartupLoginStatus,
 ) -> cursive::CursiveRunnable {
     let mut s = cursive::default();
 
@@ -165,6 +201,10 @@ pub fn init_ui(
                 false,
             );
         }
+    }
+
+    if let Some(dialog) = build_login_status_dialog(login_status) {
+        s.add_layer(dialog);
     }
 
     s

@@ -47,6 +47,42 @@ pub struct ProfileInfo {
     pub karma: Option<u32>,
 }
 
+/// Outcome of the password-login attempt made at startup when no valid
+/// cached session cookie was available. Surfaced in the UI so the user
+/// doesn't have to tail `hn-tui.log` to know whether voting will work.
+#[derive(Debug, Clone)]
+pub enum StartupLoginStatus {
+    /// No password login was attempted — either because there are no
+    /// credentials configured, or because a cached session was still valid.
+    NotAttempted,
+    /// Password login succeeded; the session cookie was refreshed on disk.
+    Success { username: String },
+    /// HN replied with `Bad login.` — the stored credentials are wrong.
+    BadLogin,
+    /// HN served a CAPTCHA challenge. The TUI can't solve it, so the user
+    /// needs to fall back to pasting a browser cookie into the auth file.
+    Captcha,
+    /// Any other error (network failure, unexpected HN response, etc.).
+    Other(String),
+}
+
+impl StartupLoginStatus {
+    /// Classify an error from [`HNClient::login`] by matching on the markers
+    /// emitted by [`classify_login_response`]. Relying on substring match is
+    /// a little fragile, but we only generate these strings in one place so
+    /// any future rename will require touching both sides together.
+    pub fn from_login_error(err: &Error) -> Self {
+        let msg = err.to_string();
+        if msg.contains("Bad login") {
+            StartupLoginStatus::BadLogin
+        } else if msg.contains("captcha") {
+            StartupLoginStatus::Captcha
+        } else {
+            StartupLoginStatus::Other(msg)
+        }
+    }
+}
+
 /// HNClient is a HTTP client to communicate with Hacker News APIs.
 #[derive(Clone)]
 pub struct HNClient {
@@ -846,7 +882,7 @@ pub fn verify_credentials(username: &str, password: &str) -> Result<Option<Strin
 mod tests {
     use super::{
         classify_login_response, parse_karma_from_profile, parse_topcolor_from_profile,
-        parse_vote_data_from_content,
+        parse_vote_data_from_content, StartupLoginStatus,
     };
     use crate::model::VoteDirection;
 
@@ -1010,6 +1046,37 @@ mod tests {
     fn returns_none_when_karma_missing() {
         let html = r#"<tr><td>user:</td><td>pg</td></tr>"#;
         assert_eq!(parse_karma_from_profile(html), None);
+    }
+
+    #[test]
+    fn classifies_bad_login_error_from_classify_response() {
+        let err = classify_login_response(r#"<html lang="en"><body>Bad login.<br></body></html>"#)
+            .unwrap_err();
+        assert!(matches!(
+            StartupLoginStatus::from_login_error(&err),
+            StartupLoginStatus::BadLogin
+        ));
+    }
+
+    #[test]
+    fn classifies_captcha_error_from_classify_response() {
+        let err = classify_login_response(
+            r#"<html lang="en"><body>Validation required.<div class="g-recaptcha"></div></body></html>"#,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            StartupLoginStatus::from_login_error(&err),
+            StartupLoginStatus::Captcha
+        ));
+    }
+
+    #[test]
+    fn classifies_unknown_error_as_other() {
+        let err = anyhow::anyhow!("connection reset");
+        match StartupLoginStatus::from_login_error(&err) {
+            StartupLoginStatus::Other(msg) => assert!(msg.contains("connection reset")),
+            other => panic!("expected Other(..), got {other:?}"),
+        }
     }
 
     #[test]

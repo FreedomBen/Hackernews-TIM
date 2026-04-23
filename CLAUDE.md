@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Agent Instructions
+
+- After making changes, commit them.  Do not push
+
 ## Commands
 
 All workflows go through the root `Makefile` (wraps cargo). Run `make help` for the full list.

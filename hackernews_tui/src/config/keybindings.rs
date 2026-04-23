@@ -350,7 +350,7 @@ impl Keys {
     }
 
     pub fn has_event(&self, e: &event::Event) -> bool {
-        self.events.iter().any(|x| *x == *e)
+        self.events.contains(e)
     }
 }
 

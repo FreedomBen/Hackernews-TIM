@@ -42,6 +42,8 @@
 //! [tree structure]: https://en.wikipedia.org/wiki/Tree_(data_structure)
 //! [dom wiki]: https://en.wikipedia.org/wiki/Document_Object_Model
 
+#![allow(dead_code, clippy::needless_return)]
+
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashSet, VecDeque};

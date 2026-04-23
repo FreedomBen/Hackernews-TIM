@@ -172,7 +172,7 @@ impl From<Comment> for HnItem {
 impl Story {
     /// get the story's article URL.
     /// If the article URL is empty (in case of "AskHN" stories), fallback to the HN story's URL
-    pub fn get_url(&self) -> Cow<str> {
+    pub fn get_url(&self) -> Cow<'_, str> {
         if self.url.is_empty() {
             Cow::from(self.story_url())
         } else {

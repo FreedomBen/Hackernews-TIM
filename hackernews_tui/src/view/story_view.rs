@@ -219,6 +219,44 @@ impl StoryView {
         }
     }
 
+    /// Move focus by approximately half a viewport's worth of rows,
+    /// mirroring vim's Ctrl-D / Ctrl-U semantics. The auto-scroll hook in
+    /// `on_set_focus_index` keeps the new focus visible.
+    fn move_focus_half_page(&mut self, forward: bool) -> Option<EventResult> {
+        let (half_page, width) = {
+            let size = self.get_inner().get_scroller().last_available_size();
+            ((size.y / 2).max(1), size.x.max(1))
+        };
+        let constraint = Vec2::new(width, 1);
+        let n = self.len();
+        if n == 0 {
+            return None;
+        }
+        let current = self.get_focus_index();
+        let target = if forward {
+            let mut accum = 0usize;
+            let mut i = current;
+            while i + 1 < n && accum < half_page {
+                i += 1;
+                if let Some(item) = self.get_item_mut(i) {
+                    accum += item.required_size(constraint).y;
+                }
+            }
+            i
+        } else {
+            let mut accum = 0usize;
+            let mut i = current;
+            while i > 0 && accum < half_page {
+                i -= 1;
+                if let Some(item) = self.get_item_mut(i) {
+                    accum += item.required_size(constraint).y;
+                }
+            }
+            i
+        };
+        self.set_focus_index(target)
+    }
+
     fn refresh_story_row(&mut self, id: usize) {
         let max_id_len = self.max_id_len;
         let starting_id = self.starting_id;
@@ -279,6 +317,7 @@ pub fn construct_story_main_view(
         |c: &Event| -> bool { config::get_story_view_keymap().goto_story.has_event(c) };
 
     let story_view_keymap = config::get_story_view_keymap().clone();
+    let scroll_keymap = config::get_scroll_keymap().clone();
 
     OnEventView::new(StoryView::new(stories, starting_id, cb_sink))
         // number parsing
@@ -372,6 +411,9 @@ pub fn construct_story_main_view(
                 Err(_) => None,
             }
         })
+        // vim-style half-page cursor movement
+        .on_pre_event_inner(scroll_keymap.page_down, |s, _| s.move_focus_half_page(true))
+        .on_pre_event_inner(scroll_keymap.page_up, |s, _| s.move_focus_half_page(false))
         .on_scroll_events()
 }
 

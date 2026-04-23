@@ -249,6 +249,47 @@ impl CommentView {
         self.update_item_text_content(id);
     }
 
+    /// Move focus by approximately half a viewport's worth of rows,
+    /// mirroring vim's Ctrl-D / Ctrl-U semantics. Hidden (collapsed)
+    /// items are skipped via `find_next_visible_item`; the auto-scroll
+    /// hook in `on_set_focus_index` keeps the new focus visible.
+    fn move_focus_half_page(&mut self, forward: bool) -> Option<EventResult> {
+        let (half_page, width) = {
+            let size = self
+                .get_inner_scroll_view()
+                .get_scroller()
+                .last_available_size();
+            ((size.y / 2).max(1), size.x.max(1))
+        };
+        let constraint = Vec2::new(width, 1);
+        let n = self.len();
+        if n == 0 {
+            return None;
+        }
+        let current = self.get_focus_index();
+        let mut target = current;
+        let mut accum = 0usize;
+        loop {
+            let dir = if forward {
+                NavigationDirection::Next
+            } else {
+                NavigationDirection::Previous
+            };
+            let next = self.find_next_visible_item(target, dir);
+            if next == target || next == n {
+                break;
+            }
+            target = next;
+            if let Some(item) = self.get_item_mut(target) {
+                accum += item.required_size(constraint).y;
+            }
+            if accum >= half_page {
+                break;
+            }
+        }
+        self.set_focus_index(target)
+    }
+
     /// Update the `id`-th item's text content based on its state-based text
     pub fn update_item_text_content(&mut self, id: usize) {
         let new_content = self.items[id].text(self.get_vote_status(self.items[id].id));
@@ -298,6 +339,7 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
     };
 
     let comment_view_keymap = config::get_comment_view_keymap().clone();
+    let scroll_keymap = config::get_scroll_keymap().clone();
 
     let article_url = data.url.clone();
     let page_url = format!("{}/item?id={}", client::HN_HOST_URL, data.root_item.id);
@@ -432,6 +474,9 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
         .on_pre_event(config::get_global_keymap().open_help_dialog.clone(), |s| {
             s.add_layer(CommentView::construct_on_event_help_view());
         })
+        // vim-style half-page cursor movement
+        .on_pre_event_inner(scroll_keymap.page_down, |s, _| s.move_focus_half_page(true))
+        .on_pre_event_inner(scroll_keymap.page_up, |s, _| s.move_focus_half_page(false))
         .on_scroll_events()
         .full_height()
 }

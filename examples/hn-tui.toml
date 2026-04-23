@@ -6,6 +6,10 @@
 
 use_page_scrolling = true
 use_pacman_loading = true
+# When logged in, fetch the user's `topcolor` from their HN profile and use it
+# for the title bar (and any other component_style entry still set to HN's
+# default orange #ff6600). Set to false to always use the theme's own colors.
+use_hn_topcolor = true
 # url_open_command = { command = "open", options = [] } # macos
 # url_open_command = { command = "xdg-open", options = [] } # linux
 # url_open_command = { command = "start", options = [] } # windows

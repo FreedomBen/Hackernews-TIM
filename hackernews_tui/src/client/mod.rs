@@ -42,9 +42,15 @@ macro_rules! log {
 }
 
 impl HNClient {
-    /// Create a new Hacker News Client
+    /// Create a new Hacker News Client using the timeout from the loaded
+    /// global config. Requires [`config::init_config`] to have been called.
     pub fn new() -> Result<HNClient> {
-        let timeout = config::get_config().client_timeout;
+        Self::with_timeout(config::get_config().client_timeout)
+    }
+
+    /// Create a new Hacker News Client with an explicit timeout (in seconds).
+    /// Useful during startup when the global config has not been sealed yet.
+    pub fn with_timeout(timeout: u64) -> Result<HNClient> {
         Ok(HNClient {
             client: ureq::AgentBuilder::new()
                 .timeout(std::time::Duration::from_secs(timeout))
@@ -545,10 +551,70 @@ impl HNClient {
         );
         Ok(())
     }
+
+    /// Fetch the logged-in user's `topcolor` from their HN profile page.
+    ///
+    /// Requires that [`login`](Self::login) has already succeeded on this
+    /// client so session cookies are attached. Returns the 6-char hex string
+    /// (without `#`), or `None` when the request fails or the value is
+    /// missing/malformed. All failures are logged and swallowed — the caller
+    /// is expected to fall back to the configured theme colour.
+    pub fn fetch_topcolor(&self, username: &str) -> Option<String> {
+        let url = format!("{HN_HOST_URL}/user?id={username}");
+        let body = log!(
+            match self.client.get(&url).call() {
+                Ok(resp) => match resp.into_string() {
+                    Ok(body) => body,
+                    Err(err) => {
+                        warn!("failed to read {url}: {err}");
+                        return None;
+                    }
+                },
+                Err(err) => {
+                    warn!("failed to fetch {url}: {err}");
+                    return None;
+                }
+            },
+            format!("fetch HN profile for topcolor (user={username})")
+        );
+        parse_topcolor_from_profile(&body)
+    }
+}
+
+/// Extract the `topcolor` value from the HTML of a HN user's profile page.
+///
+/// The edit form on `news.ycombinator.com/user?id=<self>` contains an
+/// `<input name="topcolor" value="ff6600">` (attribute order and quoting
+/// vary). This parses any near-by 6-char hex value bound to the `topcolor`
+/// input in either order, case-insensitively.
+fn parse_topcolor_from_profile(html: &str) -> Option<String> {
+    // Match `name="topcolor" value="XXXXXX"` and the reverse attribute order.
+    // Quotes are optional to tolerate HN's minimal-HTML quirks.
+    let rg = regex::Regex::new(concat!(
+        r#"(?i)"#,
+        r#"(?:"#,
+        r#"name=["']?topcolor["']?[^>]*?value=["']?([0-9a-f]{6})["']?"#,
+        r#"|"#,
+        r#"value=["']?([0-9a-f]{6})["']?[^>]*?name=["']?topcolor["']?"#,
+        r#")"#,
+    ))
+    .ok()?;
+    let cap = rg.captures(html)?;
+    cap.get(1)
+        .or_else(|| cap.get(2))
+        .map(|m| m.as_str().to_ascii_lowercase())
 }
 
 pub fn init_client() -> &'static HNClient {
     let client = HNClient::new().unwrap();
+    install_client(client)
+}
+
+/// Seal an already-built [`HNClient`] into the global slot and return a
+/// `'static` reference. Used when the client is built before the global
+/// config is sealed (e.g. so the startup login request can happen before the
+/// HN `topcolor` is applied to the theme).
+pub fn install_client(client: HNClient) -> &'static HNClient {
     CLIENT.set(client).unwrap_or_else(|_| {
         panic!("failed to set up the application's HackerNews Client");
     });
@@ -561,4 +627,46 @@ pub fn init_client() -> &'static HNClient {
 pub fn verify_credentials(username: &str, password: &str) -> Result<()> {
     let client = HNClient::new()?;
     client.login(username, password)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_topcolor_from_profile;
+
+    #[test]
+    fn extracts_default_topcolor_when_attributes_quoted() {
+        let html = r#"<tr><td>topcolor:</td><td><input type=text name="topcolor" size=6 value="ff6600"></td></tr>"#;
+        assert_eq!(parse_topcolor_from_profile(html).as_deref(), Some("ff6600"));
+    }
+
+    #[test]
+    fn extracts_custom_topcolor_without_quotes() {
+        let html = "<input type=text name=topcolor size=6 value=336699>";
+        assert_eq!(parse_topcolor_from_profile(html).as_deref(), Some("336699"));
+    }
+
+    #[test]
+    fn tolerates_reversed_attribute_order() {
+        let html = r#"<input value="abcdef" name="topcolor">"#;
+        assert_eq!(parse_topcolor_from_profile(html).as_deref(), Some("abcdef"));
+    }
+
+    #[test]
+    fn normalises_uppercase_to_lowercase() {
+        let html = r#"<input name="topcolor" value="FF6600">"#;
+        assert_eq!(parse_topcolor_from_profile(html).as_deref(), Some("ff6600"));
+    }
+
+    #[test]
+    fn returns_none_when_profile_has_no_topcolor_field() {
+        // Someone else's profile (not your own) doesn't render the edit form.
+        let html = r#"<tr><td>user:</td><td>pg</td></tr><tr><td>karma:</td><td>12345</td></tr>"#;
+        assert_eq!(parse_topcolor_from_profile(html), None);
+    }
+
+    #[test]
+    fn returns_none_when_value_is_malformed() {
+        let html = r#"<input name="topcolor" value="not-a-color">"#;
+        assert_eq!(parse_topcolor_from_profile(html), None);
+    }
 }

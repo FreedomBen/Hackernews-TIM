@@ -2,6 +2,11 @@ use config_parser2::*;
 use cursive::theme::BaseColor;
 use serde::{de, Deserialize, Deserializer};
 
+/// The HN default top-bar color (#ff6600). Any `component_style` field whose
+/// background currently matches this value is treated as an "HN orange accent"
+/// and will be re-pointed at the user's `topcolor` when the override fires.
+pub const HN_DEFAULT_TOPCOLOR_HEX: &str = "ff6600";
+
 #[derive(Default, Clone, Copy, Debug, Deserialize, ConfigParse)]
 /// Application's theme, consists of two main parts:
 /// - a terminal color palette - `palette`
@@ -9,6 +14,53 @@ use serde::{de, Deserialize, Deserializer};
 pub struct Theme {
     pub palette: Palette,
     pub component_style: ComponentStyle,
+}
+
+impl Theme {
+    /// Apply the user's HN `topcolor` (a 6-char hex value like `ff6600`) to
+    /// the theme. `title_bar.back` is always overridden; other component
+    /// styles are overridden only when their current `back` still matches
+    /// the HN default orange, so user-customised colours are preserved.
+    /// Returns `true` when at least one field was changed.
+    pub fn apply_hn_topcolor(&mut self, hex: &str) -> bool {
+        let hex = hex.trim().trim_start_matches('#');
+        let color_str = format!("#{hex}");
+        let Some(topcolor) = Color::try_parse(&color_str) else {
+            return false;
+        };
+        let default_orange = Color::parse(&format!("#{HN_DEFAULT_TOPCOLOR_HEX}"));
+
+        let cs = &mut self.component_style;
+        let mut changed = false;
+
+        // title_bar is the primary "topcolor" surface — always override.
+        if cs.title_bar.back != Some(topcolor) {
+            cs.title_bar.back = Some(topcolor);
+            changed = true;
+        }
+
+        // Other orange accents: only override if they still match the HN default.
+        for style in [
+            &mut cs.link_id,
+            &mut cs.matched_highlight,
+            &mut cs.single_code_block,
+            &mut cs.multiline_code_block,
+            &mut cs.header,
+            &mut cs.current_story_tag,
+            &mut cs.loading_bar,
+            &mut cs.ask_hn,
+            &mut cs.tell_hn,
+            &mut cs.show_hn,
+            &mut cs.launch_hn,
+        ] {
+            if style.back == Some(default_orange) {
+                style.back = Some(topcolor);
+                changed = true;
+            }
+        }
+
+        changed
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, ConfigParse)]
@@ -194,7 +246,7 @@ impl From<Style> for cursive::theme::Style {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Color(cursive::theme::Color);
 
 config_parser_impl!(Color);

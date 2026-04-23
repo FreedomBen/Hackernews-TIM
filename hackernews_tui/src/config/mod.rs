@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     pub use_page_scrolling: bool,
     pub use_pacman_loading: bool,
+    pub use_hn_topcolor: bool,
     pub client_timeout: u64,
     pub url_open_command: Command,
     pub article_parse_command: Command,
@@ -50,6 +51,7 @@ impl Default for Config {
         Config {
             use_page_scrolling: true,
             use_pacman_loading: true,
+            use_hn_topcolor: true,
             #[cfg(all(unix, not(target_os = "macos")))]
             url_open_command: Command {
                 command: "xdg-open".to_string(),
@@ -126,12 +128,15 @@ impl std::fmt::Display for Command {
 
 static CONFIG: once_cell::sync::OnceCell<Config> = once_cell::sync::OnceCell::new();
 
-/// loads the configurations from a config file.
-/// If failed to find/process the file, uses the default configurations.
-pub fn load_config(config_file_str: &str) {
+/// Load the configuration from a file, returning an owned `Config` without
+/// sealing it into the global. Callers can mutate the returned value (for
+/// example to apply a per-user HN topcolor override) before handing it to
+/// [`init_config`]. If the file can't be read or parsed, the default config
+/// is returned and the failure is logged.
+pub fn load_config_file(config_file_str: &str) -> Config {
     let config_file = std::path::PathBuf::from(config_file_str);
 
-    let config = match Config::from_file(config_file) {
+    match Config::from_file(config_file) {
         Err(err) => {
             tracing::error!(
                 "failed to load configurations from the file {config_file_str}: {err:#}\
@@ -140,13 +145,13 @@ pub fn load_config(config_file_str: &str) {
             Config::default()
         }
         Ok(config) => config,
-    };
-
-    tracing::info!("application's configurations: {:?}", config);
-    init_config(config);
+    }
 }
 
-fn init_config(config: Config) {
+/// Seal the given config into the global. Must be called exactly once, before
+/// any call to [`get_config`]. Panics on a second invocation.
+pub fn init_config(config: Config) {
+    tracing::info!("application's configurations: {:?}", config);
     CONFIG.set(config).unwrap_or_else(|_| {
         panic!("failed to set up the application's configurations");
     });

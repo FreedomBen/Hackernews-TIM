@@ -14,17 +14,7 @@ const DEFAULT_LOG_FILE: &str = "hn-tui.log";
 use clap::*;
 use prelude::*;
 
-fn run(auth: Option<config::Auth>, start_id: Option<u32>, auth_file: std::path::PathBuf) {
-    // setup HN Client
-    let client = client::init_client();
-
-    // login if authentication is specified
-    if let Some(auth) = auth {
-        if let Err(err) = client.login(&auth.username, &auth.password) {
-            tracing::warn!("Failed to login, user={}: {err}", auth.username);
-        }
-    }
-
+fn run(client: &'static client::HNClient, start_id: Option<u32>, auth_file: std::path::PathBuf) {
     // setup the application's UI
     let s = view::init_ui(client, start_id, auth_file);
 
@@ -236,13 +226,39 @@ fn main() {
         }
     }
 
-    config::load_config(config_file_str);
+    // Parse the config as a value so we can still mutate it (e.g. apply the
+    // user's HN `topcolor`) before sealing it into the global.
+    let mut config = config::load_config_file(config_file_str);
 
     let auth_file_str = args
         .get_one::<String>("auth")
         .expect("`auth` argument should have a default value");
     let auth_path = std::path::PathBuf::from(auth_file_str);
     let auth = init_auth(&auth_path);
+
+    // Build the HN client early so we can log in and (optionally) fetch the
+    // user's `topcolor` before the theme is sealed. Same client instance is
+    // then installed as the global so the session cookies carry over.
+    let hn_client =
+        client::HNClient::with_timeout(config.client_timeout).expect("failed to build HN client");
+    if let Some(auth) = &auth {
+        match hn_client.login(&auth.username, &auth.password) {
+            Err(err) => tracing::warn!("Failed to login, user={}: {err}", auth.username),
+            Ok(()) => {
+                if config.use_hn_topcolor {
+                    if let Some(hex) = hn_client.fetch_topcolor(&auth.username) {
+                        if config.theme.apply_hn_topcolor(&hex) {
+                            tracing::info!("Applied HN topcolor override: #{hex}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    config::init_config(config);
+    let client = client::install_client(hn_client);
+
     let start_id = args.get_one::<u32>("start_id").cloned();
-    run(auth, start_id, auth_path);
+    run(client, start_id, auth_path);
 }

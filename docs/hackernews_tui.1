@@ -147,14 +147,27 @@ in the comment view) and the
 .B use_hn_topcolor
 theme override. Login failures are logged as warnings and the
 application continues unauthenticated.
+.PP
+On each successful login the app captures HN's
+.B user=
+session cookie and writes it back to the auth file as a
+.B session
+field. Subsequent runs reuse that cookie to restore the session
+without re-POSTing to
+.BR /login ,
+which Hacker News throttles with a CAPTCHA after repeated attempts.
+When the cached session expires the app falls back to the stored
+password and refreshes the cookie.
 .SH FILES
 .TP
 .I $XDG_CONFIG_HOME/hn-tui.toml
 Default configuration file path.
 .TP
 .I $XDG_CONFIG_HOME/hn-auth.toml
-Default authentication file path. Stores the Hacker News username and
-password in plain text; protect its permissions accordingly.
+Default authentication file path. Stores the Hacker News username,
+password, and (after a successful login) a cached
+.B session
+cookie value in plain text; protect its permissions accordingly.
 .TP
 .I $XDG_CACHE_HOME/hn-tui.log
 Default log file.

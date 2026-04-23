@@ -319,6 +319,14 @@ By default, the authentication file lives next to `hn-tui.toml`; pass `-a` /
 plaintext TOML — protect the file with filesystem permissions and don't
 check it into version control.
 
+After a successful login the app also writes a `session` field to
+`hn-auth.toml` holding HN's `user=` cookie value. Subsequent runs reuse it
+to restore the session instead of re-POSTing to `/login`, which is what
+Hacker News throttles with a CAPTCHA after repeated attempts. If the cached
+session ever expires, the app falls back to the stored password, logs in
+again, and refreshes the cookie automatically. You can delete the `session`
+line at any time to force a fresh login on the next run.
+
 ## Logging
 
 `hackernews-tui` uses `RUST_LOG` environment variable to define the application's [logging level](https://docs.rs/log/0.4.14/log/enum.Level.html) (default to be `INFO`).

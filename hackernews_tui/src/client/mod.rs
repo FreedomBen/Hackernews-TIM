@@ -82,6 +82,63 @@ impl HNClient {
         })
     }
 
+    /// Create a new Hacker News Client whose cookie store already contains a
+    /// previously captured HN session cookie. Used at startup to restore a
+    /// logged-in session without re-POSTing to `/login` (which HN throttles
+    /// with a CAPTCHA). If the cookie parse fails the client is still
+    /// returned — the caller will fall back to a password login.
+    pub fn with_cached_session(timeout: u64, session: &str) -> Result<HNClient> {
+        let mut store = cookie_store::CookieStore::default();
+        if let Ok(url) = url::Url::parse(HN_HOST_URL) {
+            // Give the cookie an explicit Max-Age so the store doesn't
+            // discard it as a session-only cookie when it's re-parsed.
+            let cookie_str = format!("user={session}; Path=/; Max-Age=31536000");
+            if let Err(err) = store.parse(&cookie_str, &url) {
+                warn!("failed to load cached HN session cookie: {err}");
+            }
+        }
+        Ok(HNClient {
+            client: ureq::AgentBuilder::new()
+                .timeout(std::time::Duration::from_secs(timeout))
+                .cookie_store(store)
+                .build(),
+        })
+    }
+
+    /// Check whether this client's current cookie jar produces an
+    /// authenticated HN session. We fetch the front page and look for the
+    /// `logout` link that HN only renders when a valid `user` cookie is
+    /// attached. Returns `false` on any network/parse error — the caller
+    /// should treat that the same as an expired cookie.
+    pub fn verify_session(&self) -> bool {
+        let url = format!("{HN_HOST_URL}/news");
+        match self.client.get(&url).call() {
+            Ok(resp) => match resp.into_string() {
+                Ok(body) => body.contains("href=\"logout"),
+                Err(err) => {
+                    warn!("failed to read {url}: {err}");
+                    false
+                }
+            },
+            Err(err) => {
+                warn!("failed to fetch {url}: {err}");
+                false
+            }
+        }
+    }
+
+    /// Extract the current value of HN's `user` session cookie from this
+    /// client's cookie jar, if any. Called after a successful login (or
+    /// session verification) so the caller can persist the latest cookie.
+    pub fn current_session_cookie(&self) -> Option<String> {
+        let url = url::Url::parse(HN_HOST_URL).ok()?;
+        let domain = url.host_str()?;
+        self.client
+            .cookie_store()
+            .get(domain, "/", "user")
+            .map(|c| c.value().to_string())
+    }
+
     /// Get data of a HN item based on its id then parse the data
     /// to a corresponding struct representing that item
     pub fn get_item_from_id<T>(&self, id: u32) -> Result<T>
@@ -774,11 +831,15 @@ pub fn install_client(client: HNClient) -> &'static HNClient {
 }
 
 /// Verify a username/password pair against Hacker News without touching the
-/// global client. Used by the first-run prompt so credentials can be checked
-/// before they're written to disk.
-pub fn verify_credentials(username: &str, password: &str) -> Result<()> {
+/// global client, and return the resulting session cookie so the caller can
+/// persist it. Used by the first-run prompt so credentials can be checked
+/// before they're written to disk. `Ok(None)` means the login succeeded but
+/// we couldn't extract the session cookie — the caller should still save the
+/// credentials.
+pub fn verify_credentials(username: &str, password: &str) -> Result<Option<String>> {
     let client = HNClient::new()?;
-    client.login(username, password)
+    client.login(username, password)?;
+    Ok(client.current_session_cookie())
 }
 
 #[cfg(test)]

@@ -30,6 +30,12 @@ pub struct Config {
 pub struct Auth {
     pub username: String,
     pub password: String,
+    /// Cached HN session cookie value (the `user=` cookie). When present, the
+    /// app uses it to restore a logged-in session instead of POSTing to
+    /// `/login` on every startup — important because HN throttles repeated
+    /// `/login` attempts from the same IP with a CAPTCHA challenge.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<String>,
 }
 
 impl Config {
@@ -180,12 +186,47 @@ mod tests {
         let original = Auth {
             username: "alice".to_string(),
             password: "hunter2".to_string(),
+            session: None,
         };
         original.write_to_file(&path).expect("write should succeed");
 
         let parsed = Auth::from_file(&path).expect("read should succeed");
         assert_eq!(parsed.username, original.username);
         assert_eq!(parsed.password, original.password);
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn auth_write_then_read_preserves_session() {
+        let path = tmp_path("session_round_trip");
+        let _ = std::fs::remove_file(&path);
+
+        let original = Auth {
+            username: "alice".to_string(),
+            password: "hunter2".to_string(),
+            session: Some("alice&abcdef123456".to_string()),
+        };
+        original.write_to_file(&path).expect("write should succeed");
+
+        let parsed = Auth::from_file(&path).expect("read should succeed");
+        assert_eq!(parsed.session, original.session);
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn auth_read_tolerates_missing_session() {
+        // A file written by an older version has no `session` field; parsing
+        // must still succeed and leave `session` as None.
+        let path = tmp_path("missing_session");
+        let _ = std::fs::remove_file(&path);
+        std::fs::write(&path, "username = \"bob\"\npassword = \"pw\"\n")
+            .expect("seed file should succeed");
+
+        let parsed = Auth::from_file(&path).expect("read should succeed");
+        assert_eq!(parsed.username, "bob");
+        assert_eq!(parsed.session, None);
 
         std::fs::remove_file(&path).ok();
     }
@@ -199,6 +240,7 @@ mod tests {
         Auth {
             username: "bob".to_string(),
             password: "pw".to_string(),
+            session: None,
         }
         .write_to_file(&path)
         .expect("write should succeed");
@@ -218,6 +260,7 @@ mod tests {
         Auth {
             username: "carol".to_string(),
             password: "pw".to_string(),
+            session: None,
         }
         .write_to_file(&path)
         .expect("write should succeed");

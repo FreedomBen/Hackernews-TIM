@@ -48,7 +48,11 @@ pub fn get_login_dialog(client: &'static client::HNClient, auth_file: PathBuf) -
             // live client, so we only write the file if it succeeds.
             match client.login(&username, &password) {
                 Ok(()) => {
-                    let auth = config::Auth { username, password };
+                    let auth = config::Auth {
+                        username,
+                        password,
+                        session: client.current_session_cookie(),
+                    };
                     match auth.write_to_file(&auth_file) {
                         Ok(()) => {
                             s.pop_layer();

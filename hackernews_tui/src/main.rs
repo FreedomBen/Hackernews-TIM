@@ -135,11 +135,18 @@ fn init_auth(auth_path: &std::path::Path) -> Option<config::Auth> {
         match config::prompt_for_auth() {
             None | Some(config::AuthPromptResult::Skip) => return None,
             Some(config::AuthPromptResult::Credentials { username, password }) => {
-                if let Err(err) = client::verify_credentials(&username, &password) {
-                    eprintln!("Login failed: {err:#}. Starting without auth.");
-                    return None;
-                }
-                let auth = config::Auth { username, password };
+                let session = match client::verify_credentials(&username, &password) {
+                    Ok(session) => session,
+                    Err(err) => {
+                        eprintln!("Login failed: {err:#}. Starting without auth.");
+                        return None;
+                    }
+                };
+                let auth = config::Auth {
+                    username,
+                    password,
+                    session,
+                };
                 if let Err(err) = auth.write_to_file(auth_path) {
                     eprintln!("Failed to write auth to {}: {err:#}", auth_path.display());
                     return None;
@@ -158,6 +165,78 @@ fn init_auth(auth_path: &std::path::Path) -> Option<config::Auth> {
                 auth_path.display()
             );
             None
+        }
+    }
+}
+
+/// Persist `auth` back to `auth_path`, logging (but not aborting on) failure.
+/// Called whenever the startup flow refreshes the cached session cookie so
+/// the next run can skip the `/login` POST.
+fn save_auth(auth_path: &std::path::Path, auth: &config::Auth) {
+    if let Err(err) = auth.write_to_file(auth_path) {
+        tracing::warn!(
+            "Failed to persist updated session to {}: {err:#}",
+            auth_path.display()
+        );
+    }
+}
+
+/// Build the HN client and establish an authenticated session, preferring
+/// the cached session cookie over a password POST to `/login`.
+///
+/// Flow:
+/// 1. No credentials → return an anonymous client.
+/// 2. Cached session present → build a client seeded with it and verify
+///    against HN. If still valid, done. If the verification call doesn't
+///    come back cleanly (stale cookie, HN hiccup), fall through.
+/// 3. Fall back to password login on a fresh client. On success, persist
+///    the fresh session cookie so the next run can skip this whole dance.
+fn build_client_and_log_in(
+    config: &config::Config,
+    auth: &Option<config::Auth>,
+    auth_path: &std::path::Path,
+) -> (client::HNClient, bool) {
+    let Some(auth) = auth else {
+        let client = client::HNClient::with_timeout(config.client_timeout)
+            .expect("failed to build HN client");
+        return (client, false);
+    };
+
+    if let Some(session) = auth.session.as_deref() {
+        match client::HNClient::with_cached_session(config.client_timeout, session) {
+            Ok(client) if client.verify_session() => {
+                tracing::info!(
+                    "Restored HN session for {} from cached cookie",
+                    auth.username
+                );
+                return (client, true);
+            }
+            Ok(_) => {
+                tracing::info!(
+                    "Cached HN session for {} is stale; falling back to password login",
+                    auth.username
+                );
+            }
+            Err(err) => tracing::warn!("failed to build HN client with cached session: {err}"),
+        }
+    }
+
+    let client =
+        client::HNClient::with_timeout(config.client_timeout).expect("failed to build HN client");
+    match client.login(&auth.username, &auth.password) {
+        Ok(()) => {
+            let updated = config::Auth {
+                session: client.current_session_cookie(),
+                ..auth.clone()
+            };
+            if updated.session != auth.session {
+                save_auth(auth_path, &updated);
+            }
+            (client, true)
+        }
+        Err(err) => {
+            tracing::warn!("Failed to login, user={}: {err}", auth.username);
+            (client, false)
         }
     }
 }
@@ -239,26 +318,28 @@ fn main() {
     // Build the HN client early so we can log in and (optionally) fetch the
     // user's `topcolor` before the theme is sealed. Same client instance is
     // then installed as the global so the session cookies carry over.
-    let hn_client =
-        client::HNClient::with_timeout(config.client_timeout).expect("failed to build HN client");
+    //
+    // Prefer a cached session cookie if the auth file has one: HN throttles
+    // repeated `/login` POSTs from the same IP with a CAPTCHA, and the TUI
+    // can't solve it. We only fall back to the password when no cached
+    // session exists or the cached one has expired.
+    let (hn_client, logged_in) = build_client_and_log_in(&config, &auth, &auth_path);
+
     let mut user_info: Option<client::UserInfo> = None;
     if let Some(auth) = &auth {
-        match hn_client.login(&auth.username, &auth.password) {
-            Err(err) => tracing::warn!("Failed to login, user={}: {err}", auth.username),
-            Ok(()) => {
-                let profile = hn_client.fetch_profile_info(&auth.username);
-                if config.use_hn_topcolor {
-                    if let Some(hex) = profile.topcolor.as_deref() {
-                        if config.theme.apply_hn_topcolor(hex) {
-                            tracing::info!("Applied HN topcolor override: #{hex}");
-                        }
+        if logged_in {
+            let profile = hn_client.fetch_profile_info(&auth.username);
+            if config.use_hn_topcolor {
+                if let Some(hex) = profile.topcolor.as_deref() {
+                    if config.theme.apply_hn_topcolor(hex) {
+                        tracing::info!("Applied HN topcolor override: #{hex}");
                     }
                 }
-                user_info = Some(client::UserInfo {
-                    username: auth.username.clone(),
-                    karma: profile.karma,
-                });
             }
+            user_info = Some(client::UserInfo {
+                username: auth.username.clone(),
+                karma: profile.karma,
+            });
         }
     }
 

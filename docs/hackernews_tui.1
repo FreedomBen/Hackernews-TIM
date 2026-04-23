@@ -1,0 +1,251 @@
+.\" Manpage for hackernews_tui.
+.TH HACKERNEWS_TUI 1 "2026-04-23" "hackernews_tui 0.13.5" "User Commands"
+.SH NAME
+hackernews_tui \- terminal user interface for browsing Hacker News
+.SH SYNOPSIS
+.B hackernews_tui
+.RI [ OPTIONS ]
+.SH DESCRIPTION
+.B hackernews_tui
+is a fast, customizable Cursive-based terminal UI for browsing Hacker News.
+It pulls stories, comments, and search results from the Hacker News Algolia
+and Firebase APIs, and can optionally log in to vote on stories and
+comments.
+.PP
+On first run, if no configuration file exists at the
+.B \-\-config
+path and the terminal is interactive, the program prompts the user to
+write a default configuration (light or dark theme). Authentication is
+optional: if no authentication file is present and the terminal is
+interactive, the user is prompted for HN credentials, which are then
+saved to the
+.B \-\-auth
+path. When either stdin or stdout is not a TTY, both prompts are
+skipped so non-interactive invocations do not hang.
+.SH OPTIONS
+.TP
+.BI \-c\ FILE ",\ \-\-config\ " FILE
+Path to the application's configuration file. Defaults to
+.I $XDG_CONFIG_HOME/hn-tui.toml
+(or
+.IR $HOME/.config/hn-tui.toml
+as a fallback).
+.TP
+.BI \-a\ FILE ",\ \-\-auth\ " FILE
+Path to the authentication file containing the Hacker News username and
+password. Defaults to
+.I $XDG_CONFIG_HOME/hn-auth.toml
+(with the same fallback as
+.BR \-\-config ).
+.TP
+.BI \-l\ FOLDER ",\ \-\-log\ " FOLDER
+Folder in which to write the log file
+.RB ( hn-tui.log ).
+Defaults to the user's cache directory. The folder is created if it
+does not exist.
+.TP
+.BI \-i\ ID
+The Hacker News item id to start the application with. When set,
+.B hackernews_tui
+opens directly into the comment view for that item instead of the
+front page.
+.TP
+.BI \-\-init\-config\ THEME
+Write the embedded default configuration for
+.I THEME
+.RB ( light\  or\  dark )
+to the
+.B \-\-config
+path and exit. Mutually exclusive with
+.BR \-\-update\-theme .
+.TP
+.BI \-\-update\-theme\ THEME
+Replace only the
+.B [theme]
+section of the existing
+.B \-\-config
+file with the latest default for
+.I THEME
+.RB ( light\  or\  dark )
+and exit. Other sections and surrounding comments are preserved.
+Errors if the config file does not exist. Mutually exclusive with
+.BR \-\-init\-config .
+.TP
+.B \-h ,\ \-\-help
+Print a short help message and exit.
+.TP
+.B \-V ,\ \-\-version
+Print the version and exit.
+.SH KEY BINDINGS
+Press
+.B ?
+inside any view to open the in-app help dialog, which lists every
+shortcut active in that view. The tables below cover the global and
+scrolling bindings; the per-view bindings (Story, Article, Comment,
+Search) are documented in the in-app help and in the project
+.B README.
+.PP
+Global shortcuts:
+.TS
+tab(|);
+l l.
+?|Open the help dialog
+L|Open the Hacker News login dialog
+esc|Close a dialog
+q, C-c|Quit the application
+backspace, C-p|Go to the previous view
+/, C-s|Go to the search view
+F1|Front page view
+F2|All stories view
+F3|Ask HN view
+F4|Show HN view
+F5|Jobs view
+.TE
+.PP
+Scrolling shortcuts (available in scrollable views):
+.TS
+tab(|);
+l l.
+j, down|Scroll down
+k, up|Scroll up
+d, page_down|Scroll down half a page
+u, page_up|Scroll up half a page
+g, home|Scroll to top
+G, end|Scroll to bottom
+.TE
+.PP
+All bindings can be remapped in the config file. See
+.B CONFIGURATION
+below.
+.SH CONFIGURATION
+The configuration file is a TOML document. Every field is optional and
+merged over the compiled-in defaults. Notable sections:
+.TP
+.B [theme]
+Palette and per-element styles for the TUI.
+.TP
+.B [keymap]
+Global, edit, scroll, and per-view key bindings. Bindings accept
+either a single key string or an array of key strings, and support
+prefix chords such as
+.RI "\fB{" story_id "} g\fR" .
+.TP
+.B [[custom_keymaps]]
+User-defined shortcuts that open a specific story listing
+.RB ( front_page ,\  story ,\  ask_hn ,\  show_hn ,\  job )
+with a chosen sort mode.
+.PP
+A documented reference lives in
+.IR PREFIX/share/doc/hackernews_tui/config.md ,
+and example configurations in
+.IR PREFIX/share/hackernews_tui/examples/ .
+.SH AUTHENTICATION
+Authentication is best-effort. When the auth file is present and
+credentials are valid, the client logs in and enables voting
+.RB ( v
+in the comment view) and the
+.B use_hn_topcolor
+theme override. Login failures are logged as warnings and the
+application continues unauthenticated.
+.SH FILES
+.TP
+.I $XDG_CONFIG_HOME/hn-tui.toml
+Default configuration file path.
+.TP
+.I $XDG_CONFIG_HOME/hn-auth.toml
+Default authentication file path. Stores the Hacker News username and
+password in plain text; protect its permissions accordingly.
+.TP
+.I $XDG_CACHE_HOME/hn-tui.log
+Default log file.
+.TP
+.I PREFIX/share/hackernews_tui/examples/hn-tui.toml
+Default light-theme configuration template.
+.TP
+.I PREFIX/share/hackernews_tui/examples/hn-tui-dark.toml
+Default dark-theme configuration template.
+.TP
+.I PREFIX/share/doc/hackernews_tui/config.md
+Configuration reference.
+.SH ENVIRONMENT
+.TP
+.B RUST_LOG
+Tracing filter directive. Defaults to
+.BR hackernews_tui=info .
+.TP
+.B XDG_CONFIG_HOME ,\ XDG_CACHE_HOME ,\ HOME
+Used to resolve the default
+.BR \-\-config ,
+.BR \-\-auth ,
+and
+.B \-\-log
+paths.
+.SH EXIT STATUS
+.TP
+.B 0
+Normal exit, including after
+.B \-\-init\-config
+or
+.BR \-\-update\-theme .
+.TP
+.B 1
+Failed to write or update the configuration file when
+.B \-\-init\-config
+or
+.B \-\-update\-theme
+was requested.
+.SH EXAMPLES
+Run with the default configuration:
+.PP
+.RS 4
+.nf
+hackernews_tui
+.fi
+.RE
+.PP
+Open directly into a specific item's comment thread:
+.PP
+.RS 4
+.nf
+hackernews_tui -i 8863
+.fi
+.RE
+.PP
+Use a custom config, auth file, and log directory:
+.PP
+.RS 4
+.nf
+hackernews_tui -c ~/.config/hn.toml -a ~/.config/hn-auth.toml -l /tmp
+.fi
+.RE
+.PP
+Write the default dark theme to the config path, then exit:
+.PP
+.RS 4
+.nf
+hackernews_tui --init-config dark
+.fi
+.RE
+.PP
+Refresh only the
+.B [theme]
+table in an existing config with the latest light defaults:
+.PP
+.RS 4
+.nf
+hackernews_tui --update-theme light
+.fi
+.RE
+.SH SEE ALSO
+.BR xdg-open (1),
+.BR open (1)
+.PP
+Project homepage:
+.UR https://github.com/aome510/hackernews-TUI
+.UE
+.SH BUGS
+Report bugs at
+.UR https://github.com/aome510/hackernews-TUI/issues
+.UE .
+.SH AUTHORS
+Written by Thang Pham and contributors.

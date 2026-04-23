@@ -3,6 +3,8 @@ DESTDIR     ?=
 BINDIR       = ${DESTDIR}${PREFIX}/bin
 DOCDIR       = ${DESTDIR}${PREFIX}/share/doc/hackernews_tui
 EXAMPLEDIR   = ${DESTDIR}${PREFIX}/share/hackernews_tui/examples
+MANDIR       = ${DESTDIR}${PREFIX}/share/man/man1
+MANPAGE      = hackernews_tui.1
 
 CARGO       ?= cargo
 BIN_NAME     = hackernews_tui
@@ -72,15 +74,16 @@ doc: ## Build rustdoc for the workspace
 clean: ## Remove build artifacts
 	${CARGO} clean
 
-install: release ## Install binary, docs, and example configs under PREFIX
-	install -d "${BINDIR}" "${DOCDIR}" "${EXAMPLEDIR}"
+install: release ## Install binary, man page, docs, and example configs under PREFIX
+	install -d "${BINDIR}" "${DOCDIR}" "${EXAMPLEDIR}" "${MANDIR}"
 	install -m 0755 "${RELEASE_BIN}" "${BINDIR}/${BIN_NAME}"
 	install -m 0644 README.md LICENSE "${DOCDIR}/"
 	install -m 0644 docs/config.md "${DOCDIR}/"
 	install -m 0644 examples/hn-tui.toml examples/hn-tui-dark.toml "${EXAMPLEDIR}/"
+	install -m 0644 "docs/${MANPAGE}" "${MANDIR}/${MANPAGE}"
 
 uninstall: ## Remove files installed by 'install'
-	rm -f "${BINDIR}/${BIN_NAME}"
+	rm -f "${BINDIR}/${BIN_NAME}" "${MANDIR}/${MANPAGE}"
 	rm -rf "${DOCDIR}" "${EXAMPLEDIR}"
 
 docker-build: ## Build Docker image (DOCKER_IMAGE:DOCKER_TAG)

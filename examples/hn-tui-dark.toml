@@ -19,8 +19,8 @@ client_timeout = 32
 [theme.palette]
 background = "#1d1f21"
 foreground = "#de935f"
-selection_background = "#cd824e"
-selection_foreground = "#1d1f21"
+selection_background = "#3a2f26"
+selection_foreground = "#f5b079"
 black = "#000000"
 blue = "#0033bb"
 cyan = "#00aaaa"

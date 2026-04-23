@@ -91,12 +91,26 @@ impl Auth {
         P: AsRef<std::path::Path>,
     {
         let auth_str = std::fs::read_to_string(file)?;
-        Ok(toml::from_str::<Self>(&auth_str)?)
+        let mut auth = toml::from_str::<Self>(&auth_str)?;
+        // Treat the hand-editable placeholder (`session = ""`) the same as a
+        // missing field so downstream code only has to match on the `Some`
+        // case to mean "we have a cached cookie to try".
+        if auth.session.as_deref() == Some("") {
+            auth.session = None;
+        }
+        Ok(auth)
     }
 
     /// Serialize auth to TOML and write it to `file`, creating any missing
     /// parent directories. On Unix the file is chmod'd to `0600` so other
     /// local users can't read the credentials.
+    ///
+    /// The `session` key is always emitted (with an empty string when no
+    /// cookie is cached yet) alongside a comment block explaining how to
+    /// paste a browser-side cookie in by hand. This matters because HN
+    /// serves a CAPTCHA after repeated `/login` attempts, and the TUI
+    /// can't solve it — so users who get stuck need a clear way to
+    /// bootstrap the session from a browser login.
     pub fn write_to_file<P>(&self, file: P) -> anyhow::Result<()>
     where
         P: AsRef<std::path::Path>,
@@ -107,14 +121,40 @@ impl Auth {
                 std::fs::create_dir_all(parent)?;
             }
         }
-        let toml_str = toml::to_string_pretty(self)?;
-        std::fs::write(path, toml_str)?;
+        std::fs::write(path, self.to_annotated_toml())?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
         }
         Ok(())
+    }
+
+    fn to_annotated_toml(&self) -> String {
+        let mut doc = toml_edit::DocumentMut::new();
+        doc["username"] = toml_edit::value(self.username.as_str());
+        doc["password"] = toml_edit::value(self.password.as_str());
+        doc["session"] = toml_edit::value(self.session.as_deref().unwrap_or(""));
+
+        if let Some(mut key) = doc.as_table_mut().key_mut("session") {
+            key.leaf_decor_mut().set_prefix(concat!(
+                "\n",
+                "# `session` is the value of Hacker News's `user=` cookie.\n",
+                "# The TUI fills this in automatically after a successful\n",
+                "# login so later runs can skip the `/login` POST, which HN\n",
+                "# throttles with a CAPTCHA after a few attempts.\n",
+                "#\n",
+                "# If you get stuck at the CAPTCHA, populate it by hand:\n",
+                "#   1. Sign in to https://news.ycombinator.com/ in a browser.\n",
+                "#   2. Open DevTools -> Application/Storage -> Cookies ->\n",
+                "#      https://news.ycombinator.com.\n",
+                "#   3. Copy the value of the cookie named `user` (looks like\n",
+                "#      `yourname&abcdef0123...`).\n",
+                "#   4. Paste it between the quotes below.\n",
+            ));
+        }
+
+        doc.to_string()
     }
 }
 
@@ -211,6 +251,44 @@ mod tests {
 
         let parsed = Auth::from_file(&path).expect("read should succeed");
         assert_eq!(parsed.session, original.session);
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn auth_write_always_emits_session_placeholder_with_guidance() {
+        // Users who get stuck behind HN's CAPTCHA need a documented slot to
+        // paste a browser cookie into — so the `session` key is always
+        // written, with an explanatory comment, even when the app has no
+        // cached cookie yet.
+        let path = tmp_path("annotated_write");
+        let _ = std::fs::remove_file(&path);
+
+        Auth {
+            username: "alice".to_string(),
+            password: "hunter2".to_string(),
+            session: None,
+        }
+        .write_to_file(&path)
+        .expect("write should succeed");
+
+        let written = std::fs::read_to_string(&path).expect("read should succeed");
+        assert!(
+            written.contains("session = \"\""),
+            "expected empty session line, got:\n{written}"
+        );
+        assert!(
+            written.contains("user="),
+            "expected the `user=` cookie hint in the guidance, got:\n{written}"
+        );
+        assert!(
+            written.contains("news.ycombinator.com"),
+            "expected a link to HN in the guidance, got:\n{written}"
+        );
+
+        // And the round-trip still works: empty session normalises to None.
+        let parsed = Auth::from_file(&path).expect("read should succeed");
+        assert_eq!(parsed.session, None);
 
         std::fs::remove_file(&path).ok();
     }

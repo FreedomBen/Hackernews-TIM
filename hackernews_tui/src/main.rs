@@ -202,7 +202,7 @@ fn build_client_and_log_in(
         return (client, false);
     };
 
-    if let Some(session) = auth.session.as_deref() {
+    if let Some(session) = auth.session.as_deref().filter(|s| !s.is_empty()) {
         match client::HNClient::with_cached_session(config.client_timeout, session) {
             Ok(client) if client.verify_session() => {
                 tracing::info!(

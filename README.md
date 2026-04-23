@@ -319,13 +319,23 @@ By default, the authentication file lives next to `hn-tui.toml`; pass `-a` /
 plaintext TOML — protect the file with filesystem permissions and don't
 check it into version control.
 
-After a successful login the app also writes a `session` field to
-`hn-auth.toml` holding HN's `user=` cookie value. Subsequent runs reuse it
-to restore the session instead of re-POSTing to `/login`, which is what
-Hacker News throttles with a CAPTCHA after repeated attempts. If the cached
-session ever expires, the app falls back to the stored password, logs in
-again, and refreshes the cookie automatically. You can delete the `session`
-line at any time to force a fresh login on the next run.
+The auth file also carries a `session` field (always written, with an
+explanatory comment) holding HN's `user=` cookie value. Subsequent runs
+reuse it to restore the session instead of re-POSTing to `/login`, which is
+what Hacker News throttles with a CAPTCHA after repeated attempts. If the
+cached session expires, the app falls back to the stored password and
+refreshes the cookie automatically.
+
+If the TUI gets stuck on the CAPTCHA (HN served one before a first
+successful login ever completed), you can seed the session from a browser:
+
+1. Sign in to <https://news.ycombinator.com/> in a browser.
+2. Open DevTools → Application/Storage → Cookies → `https://news.ycombinator.com`.
+3. Copy the value of the cookie named `user` (looks like `yourname&abcdef0123...`).
+4. Paste it between the quotes on the `session = ""` line in `hn-auth.toml`.
+
+Clear the line (`session = ""`) at any time to force a fresh login on the
+next run.
 
 ## Logging
 

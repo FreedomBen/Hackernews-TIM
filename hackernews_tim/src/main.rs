@@ -42,7 +42,7 @@ fn run(
 /// initialize application logging
 fn init_logging(log_dir_str: &str) {
     if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "hackernews_tui=info")
+        std::env::set_var("RUST_LOG", "hackernews_tim=info")
     }
 
     let log_dir = std::path::PathBuf::from(log_dir_str);
@@ -64,7 +64,7 @@ fn init_logging(log_dir_str: &str) {
 
 /// parse command line arguments
 fn parse_args(config_dir: std::path::PathBuf, cache_dir: std::path::PathBuf) -> ArgMatches {
-    Command::new("hackernews-tui")
+    Command::new("hackernews-tim")
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .author(env!("CARGO_PKG_AUTHORS"))

@@ -6,9 +6,9 @@ User can change the application's configurations by modifying the user's config 
 
 Two example config files (with some default config values) ship with the project: [`hn-tui.toml`](https://github.com/aome510/hackernews-TUI/blob/main/examples/hn-tui.toml) for the light palette and [`hn-tui-dark.toml`](https://github.com/aome510/hackernews-TUI/blob/main/examples/hn-tui-dark.toml) for the dark palette. Both are embedded in the binary, so you don't need to download them separately.
 
-To generate a config file, run `hackernews_tui --init-config light` (or `--init-config dark` for the dark palette). It writes the chosen default to the `--config` path (or its resolved default under the user's config directory) and exits. If the config file is missing when the application launches interactively, the first-run prompt will also offer to create one; answering `s` (skip) leaves the filesystem untouched and uses built-in defaults. The prompt only fires when both stdin and stdout are TTYs, so non-interactive runs always fall through to the built-in defaults.
+To generate a config file, run `hackernews_tim --init-config light` (or `--init-config dark` for the dark palette). It writes the chosen default to the `--config` path (or its resolved default under the user's config directory) and exits. If the config file is missing when the application launches interactively, the first-run prompt will also offer to create one; answering `s` (skip) leaves the filesystem untouched and uses built-in defaults. The prompt only fires when both stdin and stdout are TTYs, so non-interactive runs always fall through to the built-in defaults.
 
-To refresh the theme in an existing config without touching keymaps or other sections, run `hackernews_tui --update-theme light` (or `--update-theme dark`). It replaces the `[theme]` table of the file at the `--config` path with the corresponding embedded default and preserves everything else, including comments. The flag errors out if the config file does not exist — use `--init-config` in that case. `--update-theme` and `--init-config` are mutually exclusive.
+To refresh the theme in an existing config without touching keymaps or other sections, run `hackernews_tim --update-theme light` (or `--update-theme dark`). It replaces the `[theme]` table of the file at the `--config` path with the corresponding embedded default and preserves everything else, including comments. The flag errors out if the config file does not exist — use `--init-config` in that case. `--update-theme` and `--init-config` are mutually exclusive.
 
 ## Table of Contents
 
@@ -43,7 +43,7 @@ To refresh the theme in an existing config without touching keymaps or other sec
 
 ### Article Parse Command
 
-`hackernews-TUI` will display an article's content in reader mode with `ArticleView`. To parse the article's content into a readable text, it will use a command in the following precedence: 
+`Hackernews-TIM` will display an article's content in reader mode with `ArticleView`. To parse the article's content into a readable text, it will use a command in the following precedence: 
 
 1. [`article_md`](https://github.com/aome510/article-md-cli) in your `$PATH`
 2. a command explicitly specified by `article_parse_command` option in your config file
@@ -169,7 +169,7 @@ Specifying the 16-bit color's name will use **the terminal's default color**. Fo
 
 ### Component Style
 
-The application defines styles for some components. For example, any links in `hackernews-TUI` has the following style by default: `link = { front = "#4fbbfd" }`.
+The application defines styles for some components. For example, any links in `Hackernews-TIM` has the following style by default: `link = { front = "#4fbbfd" }`.
 
 A style has 3 **optional** fields: `front` (foreground color), `back` (background color), `effect` (additional terminal effect).
 

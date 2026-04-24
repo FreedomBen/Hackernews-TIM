@@ -1,5 +1,5 @@
 [package]
-name = "hackernews_tui"
+name = "hackernews_tim"
 version = "0.13.5"
 authors = ["Thang Pham <phamducthang1234@gmail.com>"]
 edition = "2021"

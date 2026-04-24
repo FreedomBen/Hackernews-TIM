@@ -1,8 +1,8 @@
-# hackernews-TUI
+# Hackernews-TIM
 
-`hackernews_tui` is a fast and [customizable](https://github.com/aome510/hackernews-TUI/blob/main/docs/config.md) application for browsing Hacker News on the terminal.
+`hackernews_tim` is a fast and [customizable](https://github.com/aome510/hackernews-TUI/blob/main/docs/config.md) application for browsing Hacker News on the terminal.
 
-`hackernews_tui` is written in Rust with the help of [Cursive TUI library](https://github.com/gyscos/cursive/). It uses [HN Algolia APIs](https://hn.algolia.com/api/) and [HN Official APIs](https://github.com/HackerNews/API) to get Hacker News data.
+`hackernews_tim` is written in Rust with the help of [Cursive TUI library](https://github.com/gyscos/cursive/). It uses [HN Algolia APIs](https://hn.algolia.com/api/) and [HN Official APIs](https://github.com/HackerNews/API) to get Hacker News data.
 
 ## Table of Contents
 
@@ -37,26 +37,26 @@ Application's prebuilt binaries can be found in the [Releases Page](https://gith
 
 ### Using cargo
 
-Install the latest version from [crates.io](https://crates.io/crates/hackernews_tui) by running `cargo install hackernews_tui --locked`.
+Install the latest version from [crates.io](https://crates.io/crates/hackernews_tim) by running `cargo install hackernews_tim --locked`.
 
 ### Docker image
 
 You can download the binary image of the latest build from the `master` branch by running
 
 ```shell
-docker pull aome510/hackernews_tui:latest
+docker pull aome510/hackernews_tim:latest
 ```
 
 then run
 
 ```shell
-docker run -it aome510/hackernews_tui:latest
+docker run -it aome510/hackernews_tim:latest
 ```
 
 to run the application. You can also use your local configuration file when running the image by running
 
 ```shell
-docker run --rm -v ${CONFIG_FILE_PATH}:/app/hn-tui.toml -it aome510/hackernews_tui:latest
+docker run --rm -v ${CONFIG_FILE_PATH}:/app/hn-tui.toml -it aome510/hackernews_tim:latest
 ```
 
 with `${CONFIG_FILE_PATH}` is the path to the local configuration file.
@@ -74,13 +74,13 @@ cargo build --release
 to build the application, then run
 
 ```shell
-./target/release/hackernews_tui
+./target/release/hackernews_tim
 ```
 
 to run the application, or
 
 ```shell
-ln -sf $PWD/target/release/hackernews_tui /usr/local/bin
+ln -sf $PWD/target/release/hackernews_tim /usr/local/bin
 ```
 
 to link the executable binary to `/usr/local/bin` folder.
@@ -99,7 +99,7 @@ Run `sudo port install hackernews-tui` to install the application.
 
 ### Arch Linux
 
-Run `yay -S hackernews_tui` to install the application as an AUR package.
+Run `yay -S hackernews_tim` to install the application as an AUR package.
 
 ### NetBSD
 
@@ -120,7 +120,7 @@ make install
 
 ### Demo
 
-Demo videos of `hackernews_tui` `v0.9.0` are available on [youtube](https://www.youtube.com/watch?v=m5O5QIlRFpc) and [asciinema](https://asciinema.org/a/459196)
+Demo videos of `hackernews_tim` `v0.9.0` are available on [youtube](https://www.youtube.com/watch?v=m5O5QIlRFpc) and [asciinema](https://asciinema.org/a/459196)
 
 [![asciicast](https://asciinema.org/a/459196.svg)](https://asciinema.org/a/459196)
 
@@ -279,7 +279,7 @@ In `Navigation` mode, the `find_in_view`, `find_next_match`, and `find_prev_matc
 
 ## Configuration
 
-By default, `hackernews-tui` will look for the `hn-tui.toml` user-defined config file inside
+By default, `Hackernews-TIM` will look for the `hn-tui.toml` user-defined config file inside
 
 - the [user's config directory](https://docs.rs/dirs-next/latest/dirs_next/fn.config_dir.html)
 - `.config` directory inside the [user's home directory](https://docs.rs/dirs-next/latest/dirs_next/fn.home_dir.html)
@@ -290,23 +290,23 @@ To bypass the prompt, use `--init-config <light|dark>` to write a default config
 
 ```shell
 # write the default light-theme config to the default --config path
-hackernews_tui --init-config light
+hackernews_tim --init-config light
 
 # or pick a specific path and the dark variant
-hackernews_tui -c ~/.config/hn-tui.toml --init-config dark
+hackernews_tim -c ~/.config/hn-tui.toml --init-config dark
 ```
 
 To pull in newer theme defaults without losing customizations elsewhere, use `--update-theme <light|dark>`. It replaces only the `[theme]` section of the existing `--config` file, leaving keymap, general settings, and surrounding comments in place. It errors out if the config file does not exist (use `--init-config` to create one first).
 
 ```shell
 # refresh the dark theme in the default config file
-hackernews_tui --update-theme dark
+hackernews_tim --update-theme dark
 ```
 
 User can also specify the path to config file when running the application with `-c` or `--config` option.
 
 ```shell
-hackernews_tui -c ~/.config/hn-tui.toml
+hackernews_tim -c ~/.config/hn-tui.toml
 ```
 
 For further information about the application's configurations, please refer to the example config files ([light](https://github.com/aome510/hackernews-TUI/blob/main/examples/hn-tui.toml), [dark](https://github.com/aome510/hackernews-TUI/blob/main/examples/hn-tui-dark.toml)) and the [config documentation](https://github.com/aome510/hackernews-TUI/blob/main/docs/config.md).
@@ -354,7 +354,7 @@ next run.
 
 ## Logging
 
-`hackernews-tui` uses `RUST_LOG` environment variable to define the application's [logging level](https://docs.rs/log/0.4.14/log/enum.Level.html) (default to be `INFO`).
+`Hackernews-TIM` uses `RUST_LOG` environment variable to define the application's [logging level](https://docs.rs/log/0.4.14/log/enum.Level.html) (default to be `INFO`).
 
 By default, the application creates the `hn-tui.log` log file inside the [user's cache directory](https://docs.rs/dirs-next/latest/dirs_next/fn.cache_dir.html), which can be configured by specifying the `-l` or `--log` option.
 

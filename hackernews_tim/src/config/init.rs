@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn write_default_config_creates_parent_dirs() {
         let tmp =
-            std::env::temp_dir().join(format!("hackernews_tui_init_test_{}", std::process::id()));
+            std::env::temp_dir().join(format!("hackernews_tim_init_test_{}", std::process::id()));
         let path = tmp.join("nested").join("hn-tui.toml");
         let _ = std::fs::remove_dir_all(&tmp);
 
@@ -208,7 +208,7 @@ mod tests {
 
     fn update_theme_tmp(suffix: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!(
-            "hackernews_tui_update_theme_test_{}_{suffix}",
+            "hackernews_tim_update_theme_test_{}_{suffix}",
             std::process::id()
         ))
     }

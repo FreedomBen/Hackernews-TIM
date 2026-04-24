@@ -666,7 +666,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hackernews_tui"
+name = "hackernews_tim"
 version = "0.13.5"
 dependencies = [
  "anyhow",

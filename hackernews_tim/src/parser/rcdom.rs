@@ -9,7 +9,7 @@
 
 // This file is copied from https://github.com/servo/html5ever/blob/master/rcdom/lib.rs.
 // Because `rcdom` is not actively maintained, it's better to "fork" the code to use
-// it as a module in `hackernews_tui`.
+// it as a module in `hackernews_tim`.
 // See: https://github.com/servo/html5ever/issues/473#issuecomment-1126621820
 // Modified by: Thang pham <phamducthang1234@gmail.com>
 

@@ -1,12 +1,12 @@
-.\" Manpage for hackernews_tui.
-.TH HACKERNEWS_TUI 1 "2026-04-23" "hackernews_tui 0.13.5" "User Commands"
+.\" Manpage for hackernews_tim.
+.TH HACKERNEWS_TIM 1 "2026-04-23" "hackernews_tim 0.13.5" "User Commands"
 .SH NAME
-hackernews_tui \- terminal user interface for browsing Hacker News
+hackernews_tim \- terminal user interface for browsing Hacker News
 .SH SYNOPSIS
-.B hackernews_tui
+.B hackernews_tim
 .RI [ OPTIONS ]
 .SH DESCRIPTION
-.B hackernews_tui
+.B hackernews_tim
 is a fast, customizable Cursive-based terminal UI for browsing Hacker News.
 It pulls stories, comments, and search results from the Hacker News Algolia
 and Firebase APIs, and can optionally log in to vote on stories and
@@ -46,7 +46,7 @@ does not exist.
 .TP
 .BI \-i\ ID
 The Hacker News item id to start the application with. When set,
-.B hackernews_tui
+.B hackernews_tim
 opens directly into the comment view for that item instead of the
 front page.
 .TP
@@ -136,9 +136,9 @@ User-defined shortcuts that open a specific story listing
 with a chosen sort mode.
 .PP
 A documented reference lives in
-.IR PREFIX/share/doc/hackernews_tui/config.md ,
+.IR PREFIX/share/doc/hackernews_tim/config.md ,
 and example configurations in
-.IR PREFIX/share/hackernews_tui/examples/ .
+.IR PREFIX/share/hackernews_tim/examples/ .
 .SH AUTHENTICATION
 Authentication is best-effort. When the auth file is present and
 credentials are valid, the client logs in and enables voting
@@ -172,19 +172,19 @@ cookie value in plain text; protect its permissions accordingly.
 .I $XDG_CACHE_HOME/hn-tui.log
 Default log file.
 .TP
-.I PREFIX/share/hackernews_tui/examples/hn-tui.toml
+.I PREFIX/share/hackernews_tim/examples/hn-tui.toml
 Default light-theme configuration template.
 .TP
-.I PREFIX/share/hackernews_tui/examples/hn-tui-dark.toml
+.I PREFIX/share/hackernews_tim/examples/hn-tui-dark.toml
 Default dark-theme configuration template.
 .TP
-.I PREFIX/share/doc/hackernews_tui/config.md
+.I PREFIX/share/doc/hackernews_tim/config.md
 Configuration reference.
 .SH ENVIRONMENT
 .TP
 .B RUST_LOG
 Tracing filter directive. Defaults to
-.BR hackernews_tui=info .
+.BR hackernews_tim=info .
 .TP
 .B XDG_CONFIG_HOME ,\ XDG_CACHE_HOME ,\ HOME
 Used to resolve the default
@@ -212,7 +212,7 @@ Run with the default configuration:
 .PP
 .RS 4
 .nf
-hackernews_tui
+hackernews_tim
 .fi
 .RE
 .PP
@@ -220,7 +220,7 @@ Open directly into a specific item's comment thread:
 .PP
 .RS 4
 .nf
-hackernews_tui -i 8863
+hackernews_tim -i 8863
 .fi
 .RE
 .PP
@@ -228,7 +228,7 @@ Use a custom config, auth file, and log directory:
 .PP
 .RS 4
 .nf
-hackernews_tui -c ~/.config/hn.toml -a ~/.config/hn-auth.toml -l /tmp
+hackernews_tim -c ~/.config/hn.toml -a ~/.config/hn-auth.toml -l /tmp
 .fi
 .RE
 .PP
@@ -236,7 +236,7 @@ Write the default dark theme to the config path, then exit:
 .PP
 .RS 4
 .nf
-hackernews_tui --init-config dark
+hackernews_tim --init-config dark
 .fi
 .RE
 .PP
@@ -246,7 +246,7 @@ table in an existing config with the latest light defaults:
 .PP
 .RS 4
 .nf
-hackernews_tui --update-theme light
+hackernews_tim --update-theme light
 .fi
 .RE
 .SH SEE ALSO

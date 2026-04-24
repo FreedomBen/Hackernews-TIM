@@ -233,7 +233,7 @@ mod tests {
 
     fn tmp_path(suffix: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!(
-            "hackernews_tui_auth_test_{}_{suffix}",
+            "hackernews_tim_auth_test_{}_{suffix}",
             std::process::id()
         ))
     }

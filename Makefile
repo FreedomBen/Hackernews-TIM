@@ -1,17 +1,17 @@
 PREFIX      ?= /usr/local
 DESTDIR     ?=
 BINDIR       = ${DESTDIR}${PREFIX}/bin
-DOCDIR       = ${DESTDIR}${PREFIX}/share/doc/hackernews_tui
-EXAMPLEDIR   = ${DESTDIR}${PREFIX}/share/hackernews_tui/examples
+DOCDIR       = ${DESTDIR}${PREFIX}/share/doc/hackernews_tim
+EXAMPLEDIR   = ${DESTDIR}${PREFIX}/share/hackernews_tim/examples
 MANDIR       = ${DESTDIR}${PREFIX}/share/man/man1
-MANPAGE      = hackernews_tui.1
+MANPAGE      = hackernews_tim.1
 
 CARGO       ?= cargo
-BIN_NAME     = hackernews_tui
+BIN_NAME     = hackernews_tim
 RELEASE_BIN  = target/release/${BIN_NAME}
 DEBUG_BIN    = target/debug/${BIN_NAME}
 
-DOCKER_IMAGE ?= aome510/hackernews_tui
+DOCKER_IMAGE ?= aome510/hackernews_tim
 DOCKER_TAG   ?= latest
 CROSS_TARGET ?= x86_64-unknown-linux-gnu
 
@@ -21,7 +21,7 @@ CROSS_TARGET ?= x86_64-unknown-linux-gnu
         clean install uninstall docker-build docker-run cross-build doc
 
 help: ## Show this help
-	@echo "hackernews_tui — Makefile targets"
+	@echo "hackernews_tim — Makefile targets"
 	@echo ""
 	@echo "Usage: make [target] [PREFIX=/usr/local] [DESTDIR=]"
 	@echo ""
@@ -32,7 +32,7 @@ help: ## Show this help
 	@echo "  PREFIX        Install prefix (default: /usr/local)"
 	@echo "  DESTDIR       Staging dir for packaging (default: empty)"
 	@echo "  CARGO         Cargo binary (default: cargo)"
-	@echo "  DOCKER_IMAGE  Docker image name (default: aome510/hackernews_tui)"
+	@echo "  DOCKER_IMAGE  Docker image name (default: aome510/hackernews_tim)"
 	@echo "  DOCKER_TAG    Docker tag (default: latest)"
 	@echo "  CROSS_TARGET  Cross target triple (default: x86_64-unknown-linux-gnu)"
 
@@ -49,7 +49,7 @@ ${RELEASE_BIN}:
 	${CARGO} build --workspace --release
 
 run: ## Run the app (debug build)
-	${CARGO} run -p hackernews_tui --
+	${CARGO} run -p hackernews_tim --
 
 test: ## Run workspace tests
 	${CARGO} test --workspace

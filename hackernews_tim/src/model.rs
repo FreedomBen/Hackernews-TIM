@@ -24,6 +24,9 @@ pub struct Story {
     pub time: u64,
     pub title: String,
     pub content: String,
+    /// True when HN flagged this story as "dead". Only appears when the
+    /// viewer has `showdead=yes` set in their HN profile.
+    pub dead: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +37,9 @@ pub struct Comment {
     pub author: String,
     pub time: u64,
     pub content: String,
+    /// True when HN flagged this comment as "dead". Only appears when the
+    /// viewer has `showdead=yes` set in their HN profile.
+    pub dead: bool,
 }
 
 /// A Hacker News page data.
@@ -120,12 +126,23 @@ fn own_item_prefix(author: &str, me: Option<&str>, style: config::Style) -> Styl
     }
 }
 
+/// Mirrors HN's `[dead]` badge that shows up on the byline when `showdead` is
+/// enabled. Returns an empty styled string for live items.
+fn dead_prefix(dead: bool, style: config::Style) -> StyledString {
+    if dead {
+        StyledString::styled("[dead] ", style)
+    } else {
+        StyledString::new()
+    }
+}
+
 impl From<Story> for HnItem {
     fn from(story: Story) -> Self {
         let component_style = &config::get_config_theme().component_style;
         let me = client::get_user_info().map(|u| u.username.as_str());
 
         let metadata = utils::combine_styled_strings([
+            dead_prefix(story.dead, component_style.metadata),
             story.styled_title(),
             StyledString::plain("\n"),
             own_item_prefix(&story.author, me, component_style.own_item_indicator),
@@ -173,6 +190,7 @@ impl From<Comment> for HnItem {
         let author = comment.author.clone();
 
         let metadata = utils::combine_styled_strings([
+            dead_prefix(comment.dead, component_style.metadata),
             own_item_prefix(&comment.author, me, component_style.own_item_indicator),
             StyledString::styled(comment.author, component_style.username),
             StyledString::styled(

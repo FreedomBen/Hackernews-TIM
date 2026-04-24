@@ -233,6 +233,7 @@ impl HNClient {
                 time: item.time,
                 title: title.clone(),
                 content: text,
+                dead: item.dead,
             }
             .into(),
             "comment" => Comment {
@@ -242,6 +243,7 @@ impl HNClient {
                 author: item.by.unwrap_or_default(),
                 time: item.time,
                 content: text,
+                dead: item.dead,
             }
             .into(),
             typ => {
@@ -1030,6 +1032,10 @@ fn parse_comments_from_content(page_content: &str) -> Vec<Comment> {
     // trailing integer so we don't have to parse the human-readable half.
     let time_rg = regex::Regex::new(r#"<span class="age" title="[^"]* (\d+)">"#).unwrap();
     let text_rg = regex::Regex::new(r#"(?s)<div class="commtext[^"]*">(.*?)</div>"#).unwrap();
+    // HN marks dead comments with a literal ` [dead] ` token in the comhead,
+    // right after the empty `unv_<id>` span. With `showdead=yes` the row
+    // itself still renders, so we surface that flag to the view layer.
+    let dead_rg = regex::Regex::new(r#"<span id="unv_[^"]*"></span>[^<]*\[dead\]"#).unwrap();
 
     let anchors: Vec<(u32, usize, usize)> = anchor_rg
         .captures_iter(page_content)
@@ -1076,6 +1082,8 @@ fn parse_comments_from_content(page_content: &str) -> Vec<Comment> {
             .and_then(|m| m.as_str().parse().ok())
             .unwrap_or(0);
 
+        let dead = dead_rg.is_match(body);
+
         comments.push(Comment {
             id,
             level,
@@ -1083,6 +1091,7 @@ fn parse_comments_from_content(page_content: &str) -> Vec<Comment> {
             author,
             time,
             content,
+            dead,
         });
     }
 
@@ -1633,20 +1642,23 @@ mod tests {
     }
 
     #[test]
-    fn parses_dead_comment_row_with_visible_author_and_text() {
-        // With `?showdead=yes` passed, HN keeps the dead comment's author
-        // link and `commtext` div but swaps its text-color class to the
-        // greyed `c00`. The existing parser should pick the row up so it
-        // renders in the tree.
+    fn parses_dead_comment_row_and_sets_dead_flag() {
+        // With `?showdead=yes` HN keeps the row but tags the comhead with a
+        // literal ` [dead] ` token (sometimes ` [flagged]  [dead] `) between
+        // the empty `unv_<id>` span and the `navs` span, and greys the
+        // `commtext` to `c00`. We expect the row to parse and the `dead`
+        // flag to propagate so the view layer can prefix the byline.
         let html = concat!(
             r#"<tr class="athing comtr" id="99">"#,
             r#"<td><table><tr>"#,
             r#"<td class="ind" indent="0"></td>"#,
             r#"<td class="default"><div><span class="comhead">"#,
-            r#"<a href="user?id=deaduser" class="hnuser">deaduser</a>"#,
-            r#"<span class="age" title="2025-01-01T00:00:00 1735689600">on Jan 1, 2025</span>"#,
-            r#"</span></div>"#,
-            r#"<div class="commtext c00">[dead] this was flagged</div>"#,
+            r#"<a href="user?id=deaduser" class="hnuser">deaduser</a> "#,
+            r#"<span class="age" title="2025-01-01T00:00:00 1735689600">on Jan 1, 2025</span> "#,
+            r#"<span id="unv_99"></span> [flagged]  [dead] "#,
+            r#"<span class="navs">"#,
+            r#"</span></span></div>"#,
+            r#"<div class="commtext c00">this was flagged</div>"#,
             r#"</td></tr></table></td>"#,
             r#"</tr>"#,
         );
@@ -1654,7 +1666,28 @@ mod tests {
         assert_eq!(comments.len(), 1);
         assert_eq!(comments[0].id, 99);
         assert_eq!(comments[0].author, "deaduser");
-        assert!(comments[0].content.contains("[dead]"));
+        assert!(comments[0].dead);
+    }
+
+    #[test]
+    fn parses_live_comment_row_leaves_dead_flag_unset() {
+        let html = concat!(
+            r#"<tr class="athing comtr" id="100">"#,
+            r#"<td><table><tr>"#,
+            r#"<td class="ind" indent="0"></td>"#,
+            r#"<td class="default"><div><span class="comhead">"#,
+            r#"<a href="user?id=liveuser" class="hnuser">liveuser</a> "#,
+            r#"<span class="age" title="2025-01-01T00:00:00 1735689600">on Jan 1, 2025</span> "#,
+            r#"<span id="unv_100"></span> "#,
+            r#"<span class="navs">"#,
+            r#"</span></span></div>"#,
+            r#"<div class="commtext c00">ordinary comment</div>"#,
+            r#"</td></tr></table></td>"#,
+            r#"</tr>"#,
+        );
+        let comments = parse_comments_from_content(html);
+        assert_eq!(comments.len(), 1);
+        assert!(!comments[0].dead);
     }
 
     #[test]
@@ -1868,5 +1901,21 @@ mod tests {
             .expect("downvoted comment should have vote data");
         assert_eq!(v.vote, Some(VoteDirection::Down));
         assert!(v.can_downvote);
+    }
+
+    #[test]
+    fn fixture_flags_dead_comments_and_leaves_live_ones() {
+        // The authenticated fixture was captured with `showdead=yes`, so a
+        // handful of its rows carry the ` [dead] ` token in the comhead.
+        // Spot-check one of each so regressions on either side trip.
+        let comments = parse_comments_from_content(ITEM_PAGE_AUTHENTICATED_HTML);
+        let find = |id: u32| {
+            comments
+                .iter()
+                .find(|c| c.id == id)
+                .unwrap_or_else(|| panic!("comment {id} should appear in tree"))
+        };
+        assert!(find(47891323).dead, "47891323 should be flagged dead");
+        assert!(!find(47885819).dead, "47885819 should not be flagged dead");
     }
 }

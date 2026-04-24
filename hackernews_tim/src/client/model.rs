@@ -57,6 +57,10 @@ pub struct StoryResponse {
     // search result
     #[serde(rename(deserialize = "_highlightResult"))]
     highlight_result: Option<HighlightResultResponse>,
+
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_null_default")]
+    dead: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -76,6 +80,9 @@ pub struct ItemResponse {
 
     #[serde(default)]
     pub kids: Vec<u32>,
+
+    #[serde(default)]
+    pub dead: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,6 +98,10 @@ pub struct CommentResponse {
 
     #[serde(rename(deserialize = "created_at_i"))]
     time: u64,
+
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_null_default")]
+    dead: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -130,6 +141,7 @@ impl From<StoryResponse> for Story {
             time: s.time,
             title,
             content,
+            dead: s.dead,
         }
     }
 }
@@ -157,6 +169,7 @@ impl From<CommentResponse> for Vec<Comment> {
                 time: c.time,
                 author: c.author.unwrap_or_default(),
                 content: decode_html(&c.text.unwrap_or_default()),
+                dead: c.dead,
             }
         };
 

@@ -61,6 +61,10 @@ pub struct StoryResponse {
     #[serde(default)]
     #[serde(deserialize_with = "parse_null_default")]
     dead: bool,
+
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_null_default")]
+    flagged: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -83,6 +87,9 @@ pub struct ItemResponse {
 
     #[serde(default)]
     pub dead: bool,
+
+    #[serde(default)]
+    pub flagged: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -102,6 +109,10 @@ pub struct CommentResponse {
     #[serde(default)]
     #[serde(deserialize_with = "parse_null_default")]
     dead: bool,
+
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_null_default")]
+    flagged: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -142,6 +153,7 @@ impl From<StoryResponse> for Story {
             title,
             content,
             dead: s.dead,
+            flagged: s.flagged,
         }
     }
 }
@@ -170,6 +182,7 @@ impl From<CommentResponse> for Vec<Comment> {
                 author: c.author.unwrap_or_default(),
                 content: decode_html(&c.text.unwrap_or_default()),
                 dead: c.dead,
+                flagged: c.flagged,
             }
         };
 

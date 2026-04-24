@@ -27,6 +27,10 @@ pub struct Story {
     /// True when HN flagged this story as "dead". Only appears when the
     /// viewer has `showdead=yes` set in their HN profile.
     pub dead: bool,
+    /// True when HN shows a `[flagged]` badge on the byline (enough
+    /// user flags to drop the item's rank, which may or may not also
+    /// be dead).
+    pub flagged: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -40,6 +44,10 @@ pub struct Comment {
     /// True when HN flagged this comment as "dead". Only appears when the
     /// viewer has `showdead=yes` set in their HN profile.
     pub dead: bool,
+    /// True when HN shows a `[flagged]` badge on the byline (enough
+    /// user flags to drop the item's rank, which may or may not also
+    /// be dead).
+    pub flagged: bool,
 }
 
 /// A Hacker News page data.
@@ -126,14 +134,18 @@ fn own_item_prefix(author: &str, me: Option<&str>, style: config::Style) -> Styl
     }
 }
 
-/// Mirrors HN's `[dead]` badge that shows up on the byline when `showdead` is
-/// enabled. Returns an empty styled string for live items.
-fn dead_prefix(dead: bool, style: config::Style) -> StyledString {
-    if dead {
-        StyledString::styled("[dead] ", style)
-    } else {
-        StyledString::new()
+/// Mirrors HN's `[flagged]` / `[dead]` badges on the byline. Either, both,
+/// or neither can be present — HN orders them `[flagged] [dead]`, and we
+/// do the same. Returns an empty styled string for plain items.
+fn status_prefix(flagged: bool, dead: bool, style: config::Style) -> StyledString {
+    let mut s = StyledString::new();
+    if flagged {
+        s.append_styled("[flagged] ", style);
     }
+    if dead {
+        s.append_styled("[dead] ", style);
+    }
+    s
 }
 
 impl From<Story> for HnItem {
@@ -142,7 +154,7 @@ impl From<Story> for HnItem {
         let me = client::get_user_info().map(|u| u.username.as_str());
 
         let metadata = utils::combine_styled_strings([
-            dead_prefix(story.dead, component_style.metadata),
+            status_prefix(story.flagged, story.dead, component_style.metadata),
             story.styled_title(),
             StyledString::plain("\n"),
             own_item_prefix(&story.author, me, component_style.own_item_indicator),
@@ -190,7 +202,7 @@ impl From<Comment> for HnItem {
         let author = comment.author.clone();
 
         let metadata = utils::combine_styled_strings([
-            dead_prefix(comment.dead, component_style.metadata),
+            status_prefix(comment.flagged, comment.dead, component_style.metadata),
             own_item_prefix(&comment.author, me, component_style.own_item_indicator),
             StyledString::styled(comment.author, component_style.username),
             StyledString::styled(

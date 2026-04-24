@@ -234,6 +234,7 @@ impl HNClient {
                 title: title.clone(),
                 content: text,
                 dead: item.dead,
+                flagged: item.flagged,
             }
             .into(),
             "comment" => Comment {
@@ -244,6 +245,7 @@ impl HNClient {
                 time: item.time,
                 content: text,
                 dead: item.dead,
+                flagged: item.flagged,
             }
             .into(),
             typ => {
@@ -1032,10 +1034,12 @@ fn parse_comments_from_content(page_content: &str) -> Vec<Comment> {
     // trailing integer so we don't have to parse the human-readable half.
     let time_rg = regex::Regex::new(r#"<span class="age" title="[^"]* (\d+)">"#).unwrap();
     let text_rg = regex::Regex::new(r#"(?s)<div class="commtext[^"]*">(.*?)</div>"#).unwrap();
-    // HN marks dead comments with a literal ` [dead] ` token in the comhead,
-    // right after the empty `unv_<id>` span. With `showdead=yes` the row
-    // itself still renders, so we surface that flag to the view layer.
+    // HN marks dead / flagged comments with literal ` [flagged] ` / ` [dead] `
+    // tokens in the comhead, right after the empty `unv_<id>` span. A comment
+    // can carry either, both, or neither. With `showdead=yes` the row itself
+    // still renders, so we surface those flags to the view layer.
     let dead_rg = regex::Regex::new(r#"<span id="unv_[^"]*"></span>[^<]*\[dead\]"#).unwrap();
+    let flagged_rg = regex::Regex::new(r#"<span id="unv_[^"]*"></span>[^<]*\[flagged\]"#).unwrap();
 
     let anchors: Vec<(u32, usize, usize)> = anchor_rg
         .captures_iter(page_content)
@@ -1083,6 +1087,7 @@ fn parse_comments_from_content(page_content: &str) -> Vec<Comment> {
             .unwrap_or(0);
 
         let dead = dead_rg.is_match(body);
+        let flagged = flagged_rg.is_match(body);
 
         comments.push(Comment {
             id,
@@ -1092,6 +1097,7 @@ fn parse_comments_from_content(page_content: &str) -> Vec<Comment> {
             time,
             content,
             dead,
+            flagged,
         });
     }
 
@@ -1641,53 +1647,74 @@ mod tests {
         assert!(!parse_showdead_from_profile(html));
     }
 
+    /// Build a minimal comhead row with whatever status token string appears
+    /// between the `unv_<id>` span and the `navs` span — keeps the dead /
+    /// flagged tests focused on the tokens rather than the surrounding tags.
+    fn comment_row_with_status(id: u32, author: &str, status: &str) -> String {
+        format!(
+            concat!(
+                r#"<tr class="athing comtr" id="{id}">"#,
+                r#"<td><table><tr>"#,
+                r#"<td class="ind" indent="0"></td>"#,
+                r#"<td class="default"><div><span class="comhead">"#,
+                r#"<a href="user?id={author}" class="hnuser">{author}</a> "#,
+                r#"<span class="age" title="2025-01-01T00:00:00 1735689600">on Jan 1, 2025</span> "#,
+                r#"<span id="unv_{id}"></span>{status}"#,
+                r#"<span class="navs">"#,
+                r#"</span></span></div>"#,
+                r#"<div class="commtext c00">body</div>"#,
+                r#"</td></tr></table></td>"#,
+                r#"</tr>"#,
+            ),
+            id = id,
+            author = author,
+            status = status,
+        )
+    }
+
     #[test]
-    fn parses_dead_comment_row_and_sets_dead_flag() {
-        // With `?showdead=yes` HN keeps the row but tags the comhead with a
-        // literal ` [dead] ` token (sometimes ` [flagged]  [dead] `) between
-        // the empty `unv_<id>` span and the `navs` span, and greys the
-        // `commtext` to `c00`. We expect the row to parse and the `dead`
-        // flag to propagate so the view layer can prefix the byline.
-        let html = concat!(
-            r#"<tr class="athing comtr" id="99">"#,
-            r#"<td><table><tr>"#,
-            r#"<td class="ind" indent="0"></td>"#,
-            r#"<td class="default"><div><span class="comhead">"#,
-            r#"<a href="user?id=deaduser" class="hnuser">deaduser</a> "#,
-            r#"<span class="age" title="2025-01-01T00:00:00 1735689600">on Jan 1, 2025</span> "#,
-            r#"<span id="unv_99"></span> [flagged]  [dead] "#,
-            r#"<span class="navs">"#,
-            r#"</span></span></div>"#,
-            r#"<div class="commtext c00">this was flagged</div>"#,
-            r#"</td></tr></table></td>"#,
-            r#"</tr>"#,
-        );
-        let comments = parse_comments_from_content(html);
+    fn parses_dead_and_flagged_comment_row_and_sets_both_flags() {
+        // With `?showdead=yes` HN keeps the row but tags the comhead with
+        // literal ` [flagged] ` / ` [dead] ` tokens between the empty
+        // `unv_<id>` span and the `navs` span. A comment can carry either,
+        // both, or neither.
+        let html = comment_row_with_status(99, "deaduser", " [flagged]  [dead] ");
+        let comments = parse_comments_from_content(&html);
         assert_eq!(comments.len(), 1);
         assert_eq!(comments[0].id, 99);
         assert_eq!(comments[0].author, "deaduser");
         assert!(comments[0].dead);
+        assert!(comments[0].flagged);
     }
 
     #[test]
-    fn parses_live_comment_row_leaves_dead_flag_unset() {
-        let html = concat!(
-            r#"<tr class="athing comtr" id="100">"#,
-            r#"<td><table><tr>"#,
-            r#"<td class="ind" indent="0"></td>"#,
-            r#"<td class="default"><div><span class="comhead">"#,
-            r#"<a href="user?id=liveuser" class="hnuser">liveuser</a> "#,
-            r#"<span class="age" title="2025-01-01T00:00:00 1735689600">on Jan 1, 2025</span> "#,
-            r#"<span id="unv_100"></span> "#,
-            r#"<span class="navs">"#,
-            r#"</span></span></div>"#,
-            r#"<div class="commtext c00">ordinary comment</div>"#,
-            r#"</td></tr></table></td>"#,
-            r#"</tr>"#,
-        );
-        let comments = parse_comments_from_content(html);
+    fn parses_flagged_only_comment_row() {
+        // A comment can be flagged without being dead — enough user flags
+        // to carry a `[flagged]` badge but not enough (or not moderator-
+        // killed) to go dead.
+        let html = comment_row_with_status(101, "flaggeduser", " [flagged] ");
+        let comments = parse_comments_from_content(&html);
+        assert_eq!(comments.len(), 1);
+        assert!(comments[0].flagged);
+        assert!(!comments[0].dead);
+    }
+
+    #[test]
+    fn parses_dead_only_comment_row() {
+        let html = comment_row_with_status(102, "deaduser", " [dead] ");
+        let comments = parse_comments_from_content(&html);
+        assert_eq!(comments.len(), 1);
+        assert!(comments[0].dead);
+        assert!(!comments[0].flagged);
+    }
+
+    #[test]
+    fn parses_live_comment_row_leaves_status_flags_unset() {
+        let html = comment_row_with_status(100, "liveuser", " ");
+        let comments = parse_comments_from_content(&html);
         assert_eq!(comments.len(), 1);
         assert!(!comments[0].dead);
+        assert!(!comments[0].flagged);
     }
 
     #[test]
@@ -1904,10 +1931,10 @@ mod tests {
     }
 
     #[test]
-    fn fixture_flags_dead_comments_and_leaves_live_ones() {
+    fn fixture_sets_status_flags_from_comhead_tokens() {
         // The authenticated fixture was captured with `showdead=yes`, so a
-        // handful of its rows carry the ` [dead] ` token in the comhead.
-        // Spot-check one of each so regressions on either side trip.
+        // handful of its rows carry ` [flagged] ` / ` [dead] ` tokens in the
+        // comhead. Spot-check a few combinations so regressions trip.
         let comments = parse_comments_from_content(ITEM_PAGE_AUTHENTICATED_HTML);
         let find = |id: u32| {
             comments
@@ -1915,7 +1942,17 @@ mod tests {
                 .find(|c| c.id == id)
                 .unwrap_or_else(|| panic!("comment {id} should appear in tree"))
         };
-        assert!(find(47891323).dead, "47891323 should be flagged dead");
-        assert!(!find(47885819).dead, "47885819 should not be flagged dead");
+        // 47891323: bare `[dead]`, no `[flagged]`.
+        let dead_only = find(47891323);
+        assert!(dead_only.dead);
+        assert!(!dead_only.flagged);
+        // 47888617: both `[flagged]` and `[dead]`.
+        let both = find(47888617);
+        assert!(both.dead);
+        assert!(both.flagged);
+        // 47885819: neither.
+        let live = find(47885819);
+        assert!(!live.dead);
+        assert!(!live.flagged);
     }
 }

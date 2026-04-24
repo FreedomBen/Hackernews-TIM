@@ -354,15 +354,20 @@ successful login ever completed), you can seed the session from a browser:
 Clear the line (`session = ""`) at any time to force a fresh login on the
 next run.
 
-### Dead comments and stories
+### Dead and flagged comments and stories
 
 When logged in, `Hackernews-TIM` reads the `showdead` preference from your
 HN profile. If it's set to `yes`, dead comments and stories are fetched
-and rendered inline exactly as they would be in the web UI (including the
-`[dead]` marker). Flip the setting on
+and rendered inline exactly as they would be in the web UI, with a `[dead]`
+badge prefixed on the byline. Flip the setting on
 <https://news.ycombinator.com/user?id=YOUR_USERNAME> and restart the TUI
 to pick up the change. Unauthenticated sessions always hide dead items,
 mirroring HN itself.
+
+Items that have accumulated enough user flags to get a `[flagged]` badge
+(but not enough to be killed) are likewise prefixed with `[flagged]` on
+the byline. When an item carries both, they render as `[flagged] [dead]`,
+matching HN's own order.
 
 ## Logging
 

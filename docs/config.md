@@ -112,6 +112,8 @@ title_bar = { back = "#ff6600", effect = "bold" }
 matched_highlight = { front = "black", back = "#ffff55"}
 metadata = { front = "#828282" }
 username = { effect = "bold" }
+# orange `*` drawn next to stories/comments authored by the logged-in user
+own_item_indicator = { front = "#ff6600", effect = "bold" }
 loading_bar = { front = "light yellow", back = "blue"}
 
 # general component styles

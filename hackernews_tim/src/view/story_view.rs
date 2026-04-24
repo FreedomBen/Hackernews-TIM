@@ -146,6 +146,10 @@ impl StoryView {
             }
         }
 
+        if client::get_user_info().map(|u| u.username.as_str()) == Some(story.author.as_str()) {
+            story_text.append_styled("* ", component_style.own_item_indicator);
+        }
+
         story_text.append_styled(
             format!(
                 "{} points | by {} | {} ago | {} comments",

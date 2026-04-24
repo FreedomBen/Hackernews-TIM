@@ -47,6 +47,7 @@ title_bar = { front = "black", back = "#ff6600", effect = "bold" }
 matched_highlight = { front = "black", back = "#ffff55"}
 metadata = { front = "#626262" }
 username = { effect = "bold" }
+own_item_indicator = { front = "#ff6600", effect = "bold" }
 loading_bar = { front = "#de935f", back = "#1d1f21"}
 header = { front = "black", effect = "bold" }
 quote = { front = "#677280" }

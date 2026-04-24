@@ -59,6 +59,12 @@ impl Theme {
             }
         }
 
+        // `own_item_indicator` paints its orange via `front`, not `back`.
+        if cs.own_item_indicator.front == Some(default_orange) {
+            cs.own_item_indicator.front = Some(topcolor);
+            changed = true;
+        }
+
         changed
     }
 }
@@ -112,6 +118,7 @@ pub struct ComponentStyle {
     pub metadata: Style,
     pub current_story_tag: Style,
     pub username: Style,
+    pub own_item_indicator: Style,
     pub loading_bar: Style,
     pub ask_hn: Style,
     pub tell_hn: Style,
@@ -178,6 +185,9 @@ impl Default for ComponentStyle {
             bold: Style::default().effect(Effect::Bold),
             metadata: Style::default().front(Color::parse("#828282")),
             username: Style::default().effect(Effect::Bold),
+            own_item_indicator: Style::default()
+                .front(Color::parse(&format!("#{HN_DEFAULT_TOPCOLOR_HEX}")))
+                .effect(Effect::Bold),
             loading_bar: Style::default()
                 .front(Color::parse("light yellow"))
                 .back(Color::parse("blue")),

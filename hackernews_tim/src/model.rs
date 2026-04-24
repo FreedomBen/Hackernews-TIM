@@ -109,13 +109,26 @@ pub struct Article {
     pub date_published: Option<String>,
 }
 
+/// HN decorates stories and comments authored by the logged-in user with an
+/// orange `*` to the left of the byline. Returns that prefix when the viewer
+/// is the author, or an empty styled string otherwise.
+fn own_item_prefix(author: &str, me: Option<&str>, style: config::Style) -> StyledString {
+    if me == Some(author) {
+        StyledString::styled("* ", style)
+    } else {
+        StyledString::new()
+    }
+}
+
 impl From<Story> for HnItem {
     fn from(story: Story) -> Self {
         let component_style = &config::get_config_theme().component_style;
+        let me = client::get_user_info().map(|u| u.username.as_str());
 
         let metadata = utils::combine_styled_strings([
             story.styled_title(),
             StyledString::plain("\n"),
+            own_item_prefix(&story.author, me, component_style.own_item_indicator),
             StyledString::styled(
                 format!(
                     "{} points | by {} | {} ago | {} comments\n",
@@ -156,9 +169,11 @@ impl From<Story> for HnItem {
 impl From<Comment> for HnItem {
     fn from(comment: Comment) -> Self {
         let component_style = &config::get_config_theme().component_style;
+        let me = client::get_user_info().map(|u| u.username.as_str());
         let author = comment.author.clone();
 
         let metadata = utils::combine_styled_strings([
+            own_item_prefix(&comment.author, me, component_style.own_item_indicator),
             StyledString::styled(comment.author, component_style.username),
             StyledString::styled(
                 format!(" {} ago ", utils::get_elapsed_time_as_text(comment.time)),
@@ -309,5 +324,28 @@ impl HnItem {
         };
 
         utils::combine_styled_strings([vote_text, text])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn own_item_prefix_marks_self_author() {
+        let s = own_item_prefix("freedomben", Some("freedomben"), config::Style::default());
+        assert_eq!(s.source(), "* ");
+    }
+
+    #[test]
+    fn own_item_prefix_empty_for_other_author() {
+        let s = own_item_prefix("nkrisc", Some("freedomben"), config::Style::default());
+        assert_eq!(s.source(), "");
+    }
+
+    #[test]
+    fn own_item_prefix_empty_when_logged_out() {
+        let s = own_item_prefix("freedomben", None, config::Style::default());
+        assert_eq!(s.source(), "");
     }
 }

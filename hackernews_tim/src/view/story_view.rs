@@ -720,7 +720,7 @@ pub fn construct_story_view(
     numeric_filters: client::StoryNumericFilters,
     cb_sink: CbSink,
 ) -> impl View {
-    let starting_id = client::STORY_LIMIT * page;
+    let starting_id = config::page_size() * page;
     let find_state = find_bar::FindState::new_ref();
     let find_state_for_next = find_state.clone();
     let find_state_for_prev = find_state.clone();

@@ -18,13 +18,13 @@ const HN_OFFICIAL_PREFIX: &str = "https://hacker-news.firebaseio.com/v0";
 const HN_SEARCH_QUERY_STRING: &str =
     "tags=story&restrictSearchableAttributes=title,url&typoTolerance=false";
 pub const HN_HOST_URL: &str = "https://news.ycombinator.com";
-pub const STORY_LIMIT: usize = 20;
 
 /// Number of items served per page on HN's own listing pages
 /// (`/news`, `/ask`, `/show`, `/newest`). The TUI paginates at
-/// [`STORY_LIMIT`] (20), so a single TUI page spans 1 or 2 HN listing
-/// pages — callers that reconcile the two must sweep the range returned
-/// by [`hn_listing_pages_for_tui_page`].
+/// [`config::page_size`], which is user-configurable, so a single TUI
+/// page can span one or more HN listing pages — callers that reconcile
+/// the two must sweep the range returned by
+/// [`hn_listing_pages_for_tui_page`].
 const HN_LISTING_PAGE_SIZE: usize = 30;
 pub const SEARCH_LIMIT: usize = 15;
 
@@ -455,12 +455,13 @@ impl HNClient {
             format!("get {tag} story IDs using {request_url}")
         );
 
-        let start_id = STORY_LIMIT * page;
+        let page_size = config::page_size();
+        let start_id = page_size * page;
         if start_id >= stories.len() {
             return Ok(vec![]);
         }
 
-        let end_id = std::cmp::min(start_id + STORY_LIMIT, stories.len());
+        let end_id = std::cmp::min(start_id + page_size, stories.len());
         let ids = &stories[start_id..end_id];
 
         let request_url = format!(
@@ -470,7 +471,7 @@ impl HNClient {
                 "{tags}story_{story_id},"
             )),
             numeric_filters.query(),
-            STORY_LIMIT,
+            page_size,
         );
 
         let response = log!(
@@ -508,7 +509,7 @@ impl HNClient {
             HN_ALGOLIA_PREFIX,
             search_op,
             tag,
-            STORY_LIMIT,
+            config::page_size(),
             page,
             numeric_filters.query(),
         );
@@ -678,10 +679,10 @@ impl HNClient {
     /// caller — we'd rather render stories without vote arrows than
     /// fail the whole page load.
     ///
-    /// Because the TUI paginates at [`STORY_LIMIT`] (20) but HN paginates
+    /// Because the TUI paginates at [`config::page_size`] but HN paginates
     /// its listings at [`HN_LISTING_PAGE_SIZE`] (30), a single TUI page
-    /// can straddle two HN pages. Both are fetched and merged so every
-    /// row that has vote data available gets an arrow.
+    /// can straddle multiple HN pages. All of them are fetched and merged
+    /// so every row that has vote data available gets an arrow.
     pub fn get_listing_vote_state(
         &self,
         tag: &str,
@@ -691,7 +692,8 @@ impl HNClient {
         let Some(path) = listing_path_for_view(tag, sort_mode) else {
             return Ok(HashMap::new());
         };
-        let (first_hn_page, last_hn_page) = hn_listing_pages_for_tui_page(page);
+        let (first_hn_page, last_hn_page) =
+            hn_listing_pages_for_tui_page(page, config::page_size());
         let mut merged = HashMap::new();
         for hn_page in first_hn_page..=last_hn_page {
             let url = format!(
@@ -770,7 +772,8 @@ impl HNClient {
         let Some(path) = listing_path_for_view(tag, sort_mode) else {
             return Ok(HashMap::new());
         };
-        let (first_hn_page, last_hn_page) = hn_listing_pages_for_tui_page(page);
+        let (first_hn_page, last_hn_page) =
+            hn_listing_pages_for_tui_page(page, config::page_size());
         let mut merged = HashMap::new();
         for hn_page in first_hn_page..=last_hn_page {
             let url = format!(
@@ -1026,13 +1029,17 @@ fn listing_path_for_view(tag: &str, sort_mode: StorySortMode) -> Option<&'static
     }
 }
 
-/// The inclusive range of HN listing pages (1-indexed, 30 items per page)
-/// that together cover the items shown on a given TUI page (0-indexed,
-/// [`STORY_LIMIT`] items per page). A TUI page spans at most 2 HN listing
-/// pages because [`STORY_LIMIT`] < [`HN_LISTING_PAGE_SIZE`].
-fn hn_listing_pages_for_tui_page(page: usize) -> (usize, usize) {
-    let start_item = STORY_LIMIT * page;
-    let end_item = STORY_LIMIT * (page + 1) - 1;
+/// The inclusive range of HN listing pages (1-indexed,
+/// [`HN_LISTING_PAGE_SIZE`] items per page) that together cover the
+/// items shown on a given TUI page (0-indexed, `page_size` items per
+/// page). When `page_size` exceeds [`HN_LISTING_PAGE_SIZE`] the range
+/// spans multiple HN pages; all of them need to be fetched by the
+/// caller.
+fn hn_listing_pages_for_tui_page(page: usize, page_size: usize) -> (usize, usize) {
+    // Clamp so a config entry of 0 (or a buggy caller) doesn't wrap.
+    let page_size = page_size.max(1);
+    let start_item = page_size * page;
+    let end_item = page_size * (page + 1) - 1;
     let first = start_item / HN_LISTING_PAGE_SIZE + 1;
     let last = end_item / HN_LISTING_PAGE_SIZE + 1;
     (first, last)
@@ -1574,17 +1581,69 @@ mod tests {
     }
 
     #[test]
-    fn hn_listing_pages_cover_tui_window() {
-        // TUI pages are 20 items; HN listing pages are 30. Every TUI page
-        // spans 1 or 2 HN pages — sweeping this range is how pagination
-        // beyond page 0 keeps vote arrows visible.
-        assert_eq!(hn_listing_pages_for_tui_page(0), (1, 1)); // items 0-19
-        assert_eq!(hn_listing_pages_for_tui_page(1), (1, 2)); // items 20-39 straddle HN p1+p2
-        assert_eq!(hn_listing_pages_for_tui_page(2), (2, 2)); // items 40-59
-        assert_eq!(hn_listing_pages_for_tui_page(3), (3, 3)); // items 60-79
-        assert_eq!(hn_listing_pages_for_tui_page(4), (3, 4)); // items 80-99 straddle p3+p4
-        assert_eq!(hn_listing_pages_for_tui_page(5), (4, 4)); // items 100-119
-        assert_eq!(hn_listing_pages_for_tui_page(6), (5, 5)); // items 120-139
+    fn hn_listing_pages_cover_tui_window_default_size() {
+        // Default TUI page size is 20 items; HN listing pages are 30. Every
+        // TUI page spans 1 or 2 HN pages — sweeping this range is how
+        // pagination beyond page 0 keeps vote arrows visible.
+        assert_eq!(hn_listing_pages_for_tui_page(0, 20), (1, 1)); // items 0-19
+        assert_eq!(hn_listing_pages_for_tui_page(1, 20), (1, 2)); // items 20-39 straddle HN p1+p2
+        assert_eq!(hn_listing_pages_for_tui_page(2, 20), (2, 2)); // items 40-59
+        assert_eq!(hn_listing_pages_for_tui_page(3, 20), (3, 3)); // items 60-79
+        assert_eq!(hn_listing_pages_for_tui_page(4, 20), (3, 4)); // items 80-99 straddle p3+p4
+        assert_eq!(hn_listing_pages_for_tui_page(5, 20), (4, 4)); // items 100-119
+        assert_eq!(hn_listing_pages_for_tui_page(6, 20), (5, 5)); // items 120-139
+    }
+
+    #[test]
+    fn hn_listing_pages_handle_small_page_size() {
+        // A TUI page smaller than a HN listing page always fits inside a
+        // single HN page (except when it straddles a boundary).
+        assert_eq!(hn_listing_pages_for_tui_page(0, 10), (1, 1)); // items 0-9
+        assert_eq!(hn_listing_pages_for_tui_page(1, 10), (1, 1)); // items 10-19
+        assert_eq!(hn_listing_pages_for_tui_page(2, 10), (1, 1)); // items 20-29
+        assert_eq!(hn_listing_pages_for_tui_page(3, 10), (2, 2)); // items 30-39
+    }
+
+    #[test]
+    fn hn_listing_pages_handle_page_size_equal_to_hn_page() {
+        // A TUI page of exactly 30 aligns with HN's own listing pages.
+        assert_eq!(hn_listing_pages_for_tui_page(0, 30), (1, 1));
+        assert_eq!(hn_listing_pages_for_tui_page(1, 30), (2, 2));
+        assert_eq!(hn_listing_pages_for_tui_page(2, 30), (3, 3));
+    }
+
+    #[test]
+    fn hn_listing_pages_handle_large_page_size() {
+        // A TUI page larger than HN's 30-per-page listing must sweep
+        // multiple HN pages to collect every row's vote state.
+        // page_size=50 on TUI page 0 covers items 0-49, which spans HN p1+p2.
+        assert_eq!(hn_listing_pages_for_tui_page(0, 50), (1, 2));
+        // TUI page 1 covers items 50-99 -> HN p2+p3+p4 (item 50 in p2, item 99 in p4).
+        assert_eq!(hn_listing_pages_for_tui_page(1, 50), (2, 4));
+        // page_size=100 on TUI page 0 covers items 0-99 -> HN p1..=p4.
+        assert_eq!(hn_listing_pages_for_tui_page(0, 100), (1, 4));
+        // page_size=100 on TUI page 1 covers items 100-199 -> HN p4..=p7.
+        assert_eq!(hn_listing_pages_for_tui_page(1, 100), (4, 7));
+    }
+
+    #[test]
+    fn hn_listing_pages_handle_zero_page_size_gracefully() {
+        // A page_size of 0 would wrap/divide-by-zero; the helper clamps it
+        // to 1 so the caller still gets a sane range rather than a panic.
+        assert_eq!(hn_listing_pages_for_tui_page(0, 0), (1, 1));
+    }
+
+    #[test]
+    fn clamp_page_size_keeps_values_within_bounds() {
+        use crate::config::{clamp_page_size, MAX_PAGE_SIZE, MIN_PAGE_SIZE};
+        assert_eq!(clamp_page_size(0), MIN_PAGE_SIZE);
+        assert_eq!(clamp_page_size(1), MIN_PAGE_SIZE);
+        assert_eq!(clamp_page_size(4), MIN_PAGE_SIZE);
+        assert_eq!(clamp_page_size(5), 5);
+        assert_eq!(clamp_page_size(20), 20);
+        assert_eq!(clamp_page_size(100), 100);
+        assert_eq!(clamp_page_size(101), MAX_PAGE_SIZE);
+        assert_eq!(clamp_page_size(10_000), MAX_PAGE_SIZE);
     }
 
     #[test]

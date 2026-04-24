@@ -15,6 +15,11 @@ use_hn_topcolor = true
 # url_open_command = { command = "start", options = [] } # windows
 article_parse_command = { command = "article_md", options = [ "--format", "html" ] }
 client_timeout = 32
+# Number of stories per TUI listing page. Clamped to 5..=100.
+# Larger values mean fewer page flips but more up-front work for the
+# vote-state prefetch on HN-backed tags (front_page, ask_hn, show_hn,
+# newest). Default is 20.
+page_size = 20
 
 # ---------------------------------
 # theme

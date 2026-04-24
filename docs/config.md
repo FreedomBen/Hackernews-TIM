@@ -32,6 +32,7 @@ To refresh the theme in an existing config without touching keymaps or other sec
 | `url_open_command`      | the command the application uses to open an url in browser                                                            | See [notes](#notes) [1]                                      |
 | `article_parse_command` | the command the application uses to parse an article into a readable text                                             | `{ command = 'article_md', options = ['--format', 'html'] }` |
 | `client_timeout`        | the timeout (in seconds) when the application's client makes an API request                                           | `32`                                                         |
+| `page_size`             | number of stories per TUI listing page. Clamped to `5..=100`. Larger values mean fewer page flips but a slower first paint on HN-backed tags (`front_page`, `ask_hn`, `show_hn`, `newest`) because the vote-state prefetch scales with the page size | `20`                                                         |
 
 ### Notes
 

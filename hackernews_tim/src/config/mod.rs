@@ -11,6 +11,15 @@ pub use theme::*;
 use config_parser2::*;
 use serde::{Deserialize, Serialize};
 
+/// Inclusive bounds for [`Config::page_size`]. The floor keeps the
+/// paging UX sane (a single-digit page size makes navigation tedious
+/// and inflates per-page Algolia/Firebase round trips). The ceiling is
+/// Algolia's maximum accepted `hitsPerPage`, which is also plenty for
+/// a terminal viewport.
+pub const MIN_PAGE_SIZE: usize = 5;
+pub const MAX_PAGE_SIZE: usize = 100;
+pub const DEFAULT_PAGE_SIZE: usize = 20;
+
 #[derive(Debug, Deserialize, ConfigParse)]
 /// Config is a struct storing the application's configurations
 pub struct Config {
@@ -18,6 +27,9 @@ pub struct Config {
     pub use_pacman_loading: bool,
     pub use_hn_topcolor: bool,
     pub client_timeout: u64,
+    /// Number of stories per TUI listing page. Clamped to
+    /// [`MIN_PAGE_SIZE`]..=[`MAX_PAGE_SIZE`] on read via [`page_size`].
+    pub page_size: u64,
     pub url_open_command: Command,
     pub article_parse_command: Command,
 
@@ -78,6 +90,7 @@ impl Default for Config {
                 options: vec!["--format".to_string(), "html".to_string()],
             },
             client_timeout: 32,
+            page_size: DEFAULT_PAGE_SIZE as u64,
             theme: theme::Theme::default(),
             keymap: keybindings::KeyMap::default(),
         }
@@ -225,6 +238,18 @@ pub fn init_config(config: Config) {
 
 pub fn get_config() -> &'static Config {
     CONFIG.get().unwrap()
+}
+
+/// The story-listing page size, clamped to
+/// [`MIN_PAGE_SIZE`]..=[`MAX_PAGE_SIZE`]. Read lazily so a user-facing
+/// value out of range silently gets pulled into a working range rather
+/// than panicking or failing config parse.
+pub fn page_size() -> usize {
+    clamp_page_size(get_config().page_size as usize)
+}
+
+pub(crate) fn clamp_page_size(raw: usize) -> usize {
+    raw.clamp(MIN_PAGE_SIZE, MAX_PAGE_SIZE)
 }
 
 #[cfg(test)]

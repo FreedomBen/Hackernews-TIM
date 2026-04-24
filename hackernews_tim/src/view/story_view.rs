@@ -115,8 +115,12 @@ impl StoryView {
 
     /// Get the text summarizing basic information about a story.
     ///
-    /// When `vote` is `Some` and the user has voted in a direction, a
-    /// coloured arrow is inserted before the points count.
+    /// When `vote` is `Some`, an up arrow is inserted before the points
+    /// count — coloured if the user has already upvoted, plain otherwise.
+    /// `vote` is `None` for stories the parser couldn't attach vote links
+    /// to (e.g. "XYZ is hiring" posts, or any request made logged-out),
+    /// and those render no arrow at all. Stories can't be downvoted, so
+    /// no down arrow is ever shown.
     fn get_story_text(max_id_len: usize, story: &Story, vote: Option<&VoteData>) -> StyledString {
         let component_style = &config::get_config_theme().component_style;
         let mut story_text = story.styled_title();
@@ -137,12 +141,10 @@ impl StoryView {
         );
 
         if let Some(vd) = vote {
-            match vd.vote {
-                Some(VoteDirection::Up) => story_text.append_styled("▲ ", component_style.upvote),
-                Some(VoteDirection::Down) => {
-                    story_text.append_styled("▼ ", component_style.downvote)
-                }
-                None => {}
+            if vd.vote == Some(VoteDirection::Up) {
+                story_text.append_styled("▲ ", component_style.upvote);
+            } else {
+                story_text.append_plain("▲ ");
             }
         }
 

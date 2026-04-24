@@ -363,6 +363,10 @@ impl HasHelpView for story_view::StoryView {
                             "Toggle downvoting the focused story (requires downvote privilege)",
                         ),
                         Command::new(
+                            story_view_keymap.vouch.to_string(),
+                            "Toggle vouching for the focused story (dead stories only, requires vouch privilege)",
+                        ),
+                        Command::new(
                             story_view_keymap.reply.to_string(),
                             "Reply to the focused story in $EDITOR (requires authentication)",
                         ),
@@ -488,6 +492,10 @@ impl HasHelpView for comment_view::CommentView {
                             "Toggle downvoting the focused item (requires downvote privilege)",
                         ),
                         Command::new(
+                            comment_view_keymap.vouch.to_string(),
+                            "Toggle vouching for the focused item (dead items only, requires vouch privilege)",
+                        ),
+                        Command::new(
                             comment_view_keymap.reply.to_string(),
                             "Reply to the focused item in $EDITOR (requires authentication)",
                         ),
@@ -596,6 +604,10 @@ impl HasHelpView for search_view::SearchView {
                         Command::new(
                             story_view_keymap.downvote.to_string(),
                             "Toggle downvoting the focused story (requires downvote privilege)",
+                        ),
+                        Command::new(
+                            story_view_keymap.vouch.to_string(),
+                            "Toggle vouching for the focused story (dead stories only, requires vouch privilege)",
                         ),
                         Command::new(
                             story_view_keymap.find_in_view.to_string(),

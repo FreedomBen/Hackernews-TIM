@@ -205,6 +205,7 @@ For more information about configuring the application's key mappings or definin
 | `open_story_in_browser`        | Open in browser the focused story                                                  | `s`              |
 | `upvote`                       | Toggle upvoting the focused story (**requires [authentication](#authentication)**) | `v`              |
 | `downvote`                     | Toggle downvoting the focused story (**requires downvote privilege**)              | `V`              |
+| `vouch`                        | Toggle vouching for the focused story (**dead stories only, requires vouch privilege**) | `!`         |
 | `reply`                        | Reply to the focused story in `$EDITOR` (**requires [authentication](#authentication)**) | `r`        |
 | `next_page`                    | Go to the next page                                                                | `n`              |
 | `prev_page`                    | Go the previous page                                                               | `p`              |
@@ -251,6 +252,7 @@ For more information about configuring the application's key mappings or definin
 | `find_prev_match`              | Jump to previous find match (during a find session; esc exits)                     | `N`              |
 | `upvote`                       | Toggle upvoting the focused item (**requires [authentication](#authentication)**) | `v`              |
 | `downvote`                     | Toggle downvoting the focused item (**requires downvote privilege**)            | `V`              |
+| `vouch`                        | Toggle vouching for the focused item (**dead items only, requires vouch privilege**) | `!`           |
 | `reply`                        | Reply to the focused item in `$EDITOR` (**requires [authentication](#authentication)**) | `r`        |
 | `edit`                         | Edit the focused comment in `$EDITOR` (**your own comments only, requires [authentication](#authentication)**) | `e`        |
 | `open_article_in_browser`      | Open in browser the discussed article                                           | `a`              |
@@ -389,6 +391,7 @@ By default, the application creates the `hn-tui.log` log file inside the `hacker
 - add crediential support to allow
   - [x] authentication
   - [x] upvote/downvote
+  - [x] vouch for dead items
   - [ ] add comment
   - [ ] post
 - improve application's UI

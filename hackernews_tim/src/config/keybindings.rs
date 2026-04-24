@@ -156,6 +156,7 @@ pub struct StoryViewKeyMap {
 
     pub upvote: Keys,
     pub downvote: Keys,
+    pub vouch: Keys,
     pub reply: Keys,
 
     pub find_in_view: Keys,
@@ -184,6 +185,7 @@ impl Default for StoryViewKeyMap {
 
             upvote: Keys::new(vec!['v'.into()]),
             downvote: Keys::new(vec!['V'.into()]),
+            vouch: Keys::new(vec!['!'.into()]),
             reply: Keys::new(vec!['r'.into()]),
 
             find_in_view: Keys::new(vec!['/'.into(), event::Event::CtrlChar('f')]),
@@ -230,6 +232,7 @@ pub struct CommentViewKeyMap {
 
     pub upvote: Keys,
     pub downvote: Keys,
+    pub vouch: Keys,
     pub reply: Keys,
     pub edit: Keys,
 
@@ -260,6 +263,7 @@ impl Default for CommentViewKeyMap {
 
             upvote: Keys::new(vec!['v'.into()]),
             downvote: Keys::new(vec!['V'.into()]),
+            vouch: Keys::new(vec!['!'.into()]),
             reply: Keys::new(vec!['r'.into()]),
             edit: Keys::new(vec!['e'.into()]),
 

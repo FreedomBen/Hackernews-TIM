@@ -282,6 +282,36 @@ impl CommentView {
         true
     }
 
+    /// Toggle the viewer's vouch on the focused item.
+    ///
+    /// Absence of a [`VouchData`] entry means HN didn't render a vouch
+    /// link for the item on this page — either the item isn't dead, the
+    /// viewer lacks vouch privilege, or the viewer authored it. In any of
+    /// those cases the key no-ops. The HTTP request is fire-and-forget;
+    /// the local `vouched` flag flips optimistically so an immediate
+    /// second keypress rescinds rather than re-vouches.
+    fn apply_vouch(&mut self, client: &'static client::HNClient) -> bool {
+        let id = self.get_focus_index();
+        let item_id = self.items[id].id;
+
+        let (rescind, auth) = {
+            let Some(vd) = self.data.vouch_state.get_mut(&item_id.to_string()) else {
+                return false;
+            };
+            let rescind = vd.vouched;
+            vd.vouched = !rescind;
+            (rescind, vd.auth.clone())
+        };
+
+        std::thread::spawn(move || {
+            if let Err(err) = client.vouch(item_id, &auth, rescind) {
+                tracing::error!("Failed to vouch HN item (id={item_id}): {err}");
+            }
+        });
+
+        true
+    }
+
     fn get_item_view(&self, id: usize) -> &SingleItemView {
         self.get_item(id)
             .unwrap()
@@ -487,6 +517,10 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
         })
         .on_pre_event_inner(comment_view_keymap.downvote, move |s, _| {
             s.apply_vote(VoteDirection::Down, client);
+            Some(EventResult::Consumed(None))
+        })
+        .on_pre_event_inner(comment_view_keymap.vouch, move |s, _| {
+            s.apply_vouch(client);
             Some(EventResult::Consumed(None))
         })
         // Reply to the focused item. Stashes the request into Cursive

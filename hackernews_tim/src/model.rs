@@ -64,6 +64,10 @@ pub struct PageData {
     pub comment_receiver: CommentReceiver,
     /// the voting state of items in the page
     pub vote_state: HashMap<String, VoteData>,
+    /// per-item vouch state, keyed by item id. Only contains entries for
+    /// dead items HN rendered a `[vouch]`/`[unvouch]` link for — i.e.
+    /// items the logged-in viewer has the karma to vouch on.
+    pub vouch_state: HashMap<String, VouchData>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,6 +94,16 @@ pub struct VoteData {
     /// True when HN rendered a downvote arrow for this item — i.e. the logged-in
     /// user has the karma to downvote and the item is downvote-eligible.
     pub can_downvote: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct VouchData {
+    pub auth: String,
+    /// True when the HN page rendered `[unvouch]` rather than `[vouch]` for
+    /// this item — the viewer has already vouched and the unvouch window
+    /// hasn't expired. Used to pick `how=un` vs `how=up` when firing the
+    /// next toggle.
+    pub vouched: bool,
 }
 
 #[derive(Debug, Clone)]

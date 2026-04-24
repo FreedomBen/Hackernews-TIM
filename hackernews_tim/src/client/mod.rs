@@ -260,16 +260,19 @@ impl HNClient {
         // the comment tree. Unauthenticated sessions keep the parallel
         // Algolia path, which is faster for them and carries no freshness
         // penalty (they can't vote or reply anyway).
-        let (vote_state, comment_receiver) = if get_user_info().is_some() {
+        let (vote_state, vouch_state, comment_receiver) = if get_user_info().is_some() {
             let content = log!(
                 self.get_page_content(item_id)?,
                 format!("fetch HN page HTML for comments (id={item_id})")
             );
             let vote_state = self.parse_vote_data(&content)?;
+            let vouch_state = self.parse_vouch_data(&content)?;
             let receiver = html_comment_receiver(content);
-            (vote_state, receiver)
+            (vote_state, vouch_state, receiver)
         } else {
-            // Parallelize two tasks using [`rayon::join`](https://docs.rs/rayon/latest/rayon/fn.join.html)
+            // Parallelize two tasks using [`rayon::join`](https://docs.rs/rayon/latest/rayon/fn.join.html).
+            // Vouch state is only meaningful for logged-in users, so the
+            // anonymous path skips parsing it.
             let (vote_state, comment_receiver) = rayon::join(
                 || {
                     // get the page's vote state
@@ -284,7 +287,7 @@ impl HNClient {
                 // lazily load the page's top comments
                 || self.lazy_load_comments(item.kids),
             );
-            (vote_state?, comment_receiver?)
+            (vote_state?, HashMap::new(), comment_receiver?)
         };
 
         Ok(PageData {
@@ -293,6 +296,7 @@ impl HNClient {
             root_item,
             comment_receiver,
             vote_state,
+            vouch_state,
         })
     }
 
@@ -699,6 +703,77 @@ impl HNClient {
                 self.client.get(&vote_url).call()?;
             },
             format!("vote HN item (id={id})")
+        );
+        Ok(())
+    }
+
+    /// Parse vouch data of items in a page.
+    ///
+    /// Returns a map from item id to a [`VouchData`] describing whether the
+    /// logged-in user has vouched for the item and the auth token needed to
+    /// submit a vouch/unvouch request. Only contains entries for items HN
+    /// rendered a vouch link for — dead items the viewer has the karma to
+    /// vouch on.
+    pub fn parse_vouch_data(&self, page_content: &str) -> Result<HashMap<String, VouchData>> {
+        parse_vouch_data_from_content(page_content)
+    }
+
+    /// Fetch the HN item page for a single item and return its [`VouchData`].
+    ///
+    /// Used by the story list to lazily discover the auth token the first
+    /// time the user tries to vouch on a given dead item. Returns `Ok(None)`
+    /// when HN doesn't render a vouch link for the item (not dead, not
+    /// logged in, insufficient karma, or the viewer authored the item).
+    pub fn get_vouch_data_for_item(&self, item_id: u32) -> Result<Option<VouchData>> {
+        let content = self.get_page_content(item_id)?;
+        let mut map = self.parse_vouch_data(&content)?;
+        Ok(map.remove(&item_id.to_string()))
+    }
+
+    /// Fetch vouch state for every item on an HN listing page in one request.
+    ///
+    /// Mirrors [`get_listing_vote_state`](Self::get_listing_vote_state). HN
+    /// only renders a vouch link on the listing for dead items the viewer
+    /// has privilege to vouch on, so most listings will return an empty map
+    /// — that's the common case and is expected.
+    pub fn get_listing_vouch_state(
+        &self,
+        tag: &str,
+        page: usize,
+    ) -> Result<HashMap<u32, VouchData>> {
+        let Some(path) = listing_path_for_tag(tag) else {
+            return Ok(HashMap::new());
+        };
+        let url = format!(
+            "{HN_HOST_URL}/{path}?p={}{}",
+            page + 1,
+            showdead_query_suffix("&")
+        );
+        let content = log!(
+            self.client.get(&url).call()?.into_string()?,
+            format!("fetch listing vouch state (tag={tag}, page={page}) using {url}")
+        );
+        let map = parse_vouch_data_from_content(&content)?;
+        Ok(map
+            .into_iter()
+            .filter_map(|(k, v)| k.parse::<u32>().ok().map(|id| (id, v)))
+            .collect())
+    }
+
+    /// Vouch for (or unvouch) a dead HN item.
+    ///
+    /// `rescind = false` sends `how=up` to restore karma to the item.
+    /// `rescind = true` sends `how=un` to take that vouch back. Only
+    /// meaningful on dead items the viewer has the karma to vouch on — the
+    /// caller should gate on that before calling.
+    pub fn vouch(&self, id: u32, auth: &str, rescind: bool) -> Result<()> {
+        log!(
+            {
+                let how = if rescind { "un" } else { "up" };
+                let url = format!("{HN_HOST_URL}/vouch?id={id}&how={how}&auth={auth}");
+                self.client.get(&url).call()?;
+            },
+            format!("vouch HN item (id={id}, rescind={rescind})")
         );
         Ok(())
     }
@@ -1248,6 +1323,48 @@ fn parse_vote_data_from_content(page_content: &str) -> Result<HashMap<String, Vo
     Ok(hm)
 }
 
+/// Parse vouch data out of a rendered HN item or listing page.
+///
+/// HN only renders a vouch anchor for dead items the viewer has the karma
+/// to vouch on (30+ as of this writing) and isn't the author of. The anchor
+/// looks like:
+///
+/// ```html
+/// <a id='vouch_<id>' ... href='vouch?id=<id>&how=up&auth=<token>&goto=...'>vouch</a>
+/// ```
+///
+/// Once the viewer has vouched, HN rewrites the same anchor to advertise
+/// the reverse action: the inner text becomes `unvouch` and the `how`
+/// parameter flips to `un`. We key off the inner text because it's the
+/// same signal HN's own JavaScript uses, and it doesn't require us to
+/// understand the `goto` query the anchor carries. Items without any
+/// `vouch_<id>` anchor are omitted from the returned map — callers can
+/// treat absence as "vouching is unavailable for this item".
+fn parse_vouch_data_from_content(page_content: &str) -> Result<HashMap<String, VouchData>> {
+    let vouch_rg = regex::Regex::new(
+        "<a[^>]*?id='vouch_(?P<id>[^']*?)'[^>]*?auth=(?P<auth>[0-9a-z]*)[^>]*?>(?P<text>[^<]*)</a>",
+    )?;
+
+    let mut hm: HashMap<String, VouchData> = HashMap::new();
+    for c in vouch_rg.captures_iter(page_content) {
+        let id = c.name("id").unwrap().as_str().to_owned();
+        let auth = c.name("auth").unwrap().as_str().to_owned();
+        let text = c.name("text").map(|m| m.as_str().trim()).unwrap_or("");
+        // HN renders `vouch` before the viewer has vouched and `unvouch`
+        // after. Any other text (empty, unexpected) falls through to the
+        // "not vouched" branch — it's the safe default, since a stale
+        // `vouched=true` would turn the next keypress into an unintended
+        // unvouch.
+        let vouched = text.eq_ignore_ascii_case("unvouch");
+        if auth.is_empty() {
+            continue;
+        }
+        hm.insert(id, VouchData { auth, vouched });
+    }
+
+    Ok(hm)
+}
+
 /// Extract the `topcolor` value from the HTML of a HN user's profile page.
 ///
 /// The edit form on `news.ycombinator.com/user?id=<self>` renders the
@@ -1365,7 +1482,8 @@ mod tests {
     use super::{
         classify_login_response, listing_path_for_tag, parse_comments_from_content,
         parse_karma_from_profile, parse_reply_form, parse_showdead_from_profile,
-        parse_topcolor_from_profile, parse_vote_data_from_content, StartupLoginStatus,
+        parse_topcolor_from_profile, parse_vote_data_from_content, parse_vouch_data_from_content,
+        StartupLoginStatus,
     };
     use crate::model::VoteDirection;
 
@@ -1544,6 +1662,56 @@ mod tests {
         let html = "<tr><td>just a comment row with no vote links</td></tr>";
         let data = parse_vote_data_from_content(html).unwrap();
         assert!(data.is_empty());
+    }
+
+    #[test]
+    fn parses_vouch_link_as_unvouched() {
+        // Dead item the viewer can vouch for: inner text `vouch`, href
+        // carries `how=up`. Parser should record `vouched=false` so the
+        // next keypress fires a fresh vouch.
+        let html = concat!(
+            "<a class='clicky' id='vouch_100' ",
+            "href='vouch?id=100&amp;how=up&amp;auth=abcdef&amp;goto=item%3Fid%3D100'>vouch</a>",
+        );
+        let data = parse_vouch_data_from_content(html).unwrap();
+        let vd = data.get("100").expect("expected vouch data for id=100");
+        assert_eq!(vd.auth, "abcdef");
+        assert!(!vd.vouched);
+    }
+
+    #[test]
+    fn parses_unvouch_link_as_already_vouched() {
+        // Same item after the viewer vouched: HN flips the inner text to
+        // `unvouch` and the `how` query to `un`. Parser should flag it so
+        // the next keypress rescinds rather than re-vouches.
+        let html = concat!(
+            "<a class='clicky' id='vouch_101' ",
+            "href='vouch?id=101&amp;how=un&amp;auth=abcdef&amp;goto=item%3Fid%3D101'>unvouch</a>",
+        );
+        let data = parse_vouch_data_from_content(html).unwrap();
+        let vd = data.get("101").expect("expected vouch data for id=101");
+        assert!(vd.vouched);
+    }
+
+    #[test]
+    fn ignores_pages_without_vouch_links() {
+        // A non-dead item, or one the viewer lacks privilege to vouch on,
+        // has no `vouch_<id>` anchor at all — the map stays empty.
+        let html = concat!(
+            "<a id='up_5' class='clicky' href='vote?id=5&amp;how=up&amp;auth=555555'>▲</a>",
+            "<a id='down_5' class='clicky' href='vote?id=5&amp;how=down&amp;auth=555555'>▽</a>",
+        );
+        let data = parse_vouch_data_from_content(html).unwrap();
+        assert!(data.is_empty());
+    }
+
+    #[test]
+    fn skips_vouch_anchors_missing_auth_token() {
+        // Without an auth token we can't fire the request, so a malformed
+        // entry should be dropped rather than surfaced with an empty auth.
+        let html = "<a id='vouch_102' href='vouch?id=102&amp;how=up'>vouch</a>";
+        let data = parse_vouch_data_from_content(html).unwrap();
+        assert!(!data.contains_key("102"));
     }
 
     #[test]

@@ -11,6 +11,7 @@ use crate::prelude::*;
 static STORY_TAGS: [&str; 5] = ["front_page", "story", "ask_hn", "show_hn", "job"];
 
 type VoteUpdate = (u32, VoteData);
+type VouchUpdate = (u32, VouchData);
 
 /// StoryView is a View displaying a list stories corresponding
 /// to a particular category (top stories, newest stories, most popular stories, etc).
@@ -33,6 +34,15 @@ pub struct StoryView {
     vote_state: HashMap<u32, VoteData>,
     vote_sender: mpsc::Sender<VoteUpdate>,
     vote_receiver: mpsc::Receiver<VoteUpdate>,
+
+    // Vouch state follows the same background-fetch pattern as vote state,
+    // but isn't fetched eagerly — HN only renders vouch links for dead
+    // items the viewer has enough karma to vouch on, which is a small
+    // fraction of any listing page. Vouching in the story list is rare
+    // enough that the lazy per-item fetch is fine on first keypress.
+    vouch_state: HashMap<u32, VouchData>,
+    vouch_sender: mpsc::Sender<VouchUpdate>,
+    vouch_receiver: mpsc::Receiver<VouchUpdate>,
     cb_sink: CbSink,
 
     find_state: FindStateRef,
@@ -43,6 +53,7 @@ impl ViewWrapper for StoryView {
 
     fn wrap_layout(&mut self, size: Vec2) {
         self.try_update_vote_state();
+        self.try_update_vouch_state();
         self.process_find_signal();
         self.view.layout(size);
     }
@@ -60,6 +71,7 @@ impl StoryView {
         let view =
             Self::construct_story_list(&stories, starting_id, max_id_len, &initial_vote_state);
         let (vote_sender, vote_receiver) = mpsc::channel();
+        let (vouch_sender, vouch_receiver) = mpsc::channel();
         StoryView {
             view,
             stories,
@@ -69,6 +81,9 @@ impl StoryView {
             vote_state: initial_vote_state,
             vote_sender,
             vote_receiver,
+            vouch_state: HashMap::new(),
+            vouch_sender,
+            vouch_receiver,
             cb_sink,
             find_state,
         }
@@ -240,6 +255,75 @@ impl StoryView {
             if let Some(idx) = self.stories.iter().position(|s| s.id == story_id) {
                 self.refresh_story_row(idx);
             }
+        }
+    }
+
+    /// Toggle the viewer's vouch on the currently focused story.
+    ///
+    /// No-ops unless the story is dead — HN only accepts vouches on dead
+    /// items, and firing the request on a live item would either 404 or
+    /// bounce silently. Mirrors [`Self::apply_vote`]: a background thread
+    /// fetches the story page to recover the auth token and the current
+    /// `[vouch]`/`[unvouch]` state, posts the flip, and reports the new
+    /// state back via `vouch_receiver`.
+    fn apply_vouch(&mut self, client: &'static client::HNClient) {
+        let id = self.get_focus_index();
+        if id >= self.stories.len() {
+            return;
+        }
+        let story = &self.stories[id];
+        if !story.dead {
+            warn!(
+                "ignoring vouch keypress on non-dead story (id={})",
+                story.id
+            );
+            return;
+        }
+        let story_id = story.id;
+        let sender = self.vouch_sender.clone();
+        let cb_sink = self.cb_sink.clone();
+
+        std::thread::spawn(move || {
+            let vd = match client.get_vouch_data_for_item(story_id) {
+                Ok(Some(vd)) => vd,
+                Ok(None) => {
+                    warn!(
+                        "no vouch link for story (id={}) — item may not be dead for this viewer, or the viewer lacks vouch privilege",
+                        story_id
+                    );
+                    return;
+                }
+                Err(err) => {
+                    warn!(
+                        "failed to fetch vouch data for story (id={}): {}",
+                        story_id, err
+                    );
+                    return;
+                }
+            };
+
+            let rescind = vd.vouched;
+            if let Err(err) = client.vouch(story_id, &vd.auth, rescind) {
+                error!("failed to vouch HN story (id={}): {}", story_id, err);
+                return;
+            }
+
+            let updated = VouchData {
+                auth: vd.auth,
+                vouched: !rescind,
+            };
+            let _ = sender.send((story_id, updated));
+            let _ = cb_sink.send(Box::new(|_| {}));
+        });
+    }
+
+    /// Drain completed vouch updates from the channel. No row repaint is
+    /// needed because the byline `[dead]` badge doesn't change on vouch —
+    /// HN leaves the item flagged until enough vouches accumulate — and we
+    /// don't surface a per-story "you vouched" indicator in the list.
+    fn try_update_vouch_state(&mut self) {
+        while let Ok((story_id, vd)) = self.vouch_receiver.try_recv() {
+            self.vouch_state.insert(story_id, vd);
         }
     }
 
@@ -512,6 +596,10 @@ pub fn construct_story_main_view(
     })
     .on_pre_event_inner(story_view_keymap.downvote, move |s, _| {
         s.apply_vote(VoteDirection::Down, client);
+        Some(EventResult::Consumed(None))
+    })
+    .on_pre_event_inner(story_view_keymap.vouch, move |s, _| {
+        s.apply_vouch(client);
         Some(EventResult::Consumed(None))
     })
     // open external link shortcuts

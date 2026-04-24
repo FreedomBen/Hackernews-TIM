@@ -19,6 +19,13 @@ const HN_SEARCH_QUERY_STRING: &str =
     "tags=story&restrictSearchableAttributes=title,url&typoTolerance=false";
 pub const HN_HOST_URL: &str = "https://news.ycombinator.com";
 pub const STORY_LIMIT: usize = 20;
+
+/// Number of items served per page on HN's own listing pages
+/// (`/news`, `/ask`, `/show`, `/newest`). The TUI paginates at
+/// [`STORY_LIMIT`] (20), so a single TUI page spans 1 or 2 HN listing
+/// pages — callers that reconcile the two must sweep the range returned
+/// by [`hn_listing_pages_for_tui_page`].
+const HN_LISTING_PAGE_SIZE: usize = 30;
 pub const SEARCH_LIMIT: usize = 15;
 
 static CLIENT: once_cell::sync::OnceCell<HNClient> = once_cell::sync::OnceCell::new();
@@ -658,34 +665,52 @@ impl HNClient {
         Ok(map.remove(&item_id.to_string()))
     }
 
-    /// Fetch vote state for every item on an HN listing page in one request.
+    /// Fetch vote state for every item on an HN listing page.
     ///
-    /// Maps internal story tags to their `news.ycombinator.com` equivalents
-    /// (`front_page` → `/news`, `ask_hn` → `/ask`, `show_hn` → `/show`), so
-    /// opening the story list surfaces the user's existing up/down arrows
-    /// without waiting for the lazy per-item fetch. Tags that don't have a
-    /// stable HN listing URL (Algolia-sorted results, `story`/`job`, custom
-    /// keymaps, search) return an empty map; those views keep the existing
-    /// lazy behavior. Errors are non-fatal for the caller — we'd rather
-    /// render stories without vote arrows than fail the whole page load.
-    pub fn get_listing_vote_state(&self, tag: &str, page: usize) -> Result<HashMap<u32, VoteData>> {
-        let Some(path) = listing_path_for_tag(tag) else {
+    /// Maps a TUI view (tag + sort mode) to its `news.ycombinator.com`
+    /// equivalent (`front_page` → `/news`, `ask_hn` → `/ask`, `show_hn` →
+    /// `/show`, `story` by date → `/newest`), so opening the story list
+    /// surfaces the user's existing up/down arrows without waiting for
+    /// the lazy per-item fetch. Views that don't have a stable HN
+    /// listing URL (Algolia-sorted results outside the mappings above,
+    /// `job`, custom keymaps, search) return an empty map; those views
+    /// keep the existing lazy behavior. Errors are non-fatal for the
+    /// caller — we'd rather render stories without vote arrows than
+    /// fail the whole page load.
+    ///
+    /// Because the TUI paginates at [`STORY_LIMIT`] (20) but HN paginates
+    /// its listings at [`HN_LISTING_PAGE_SIZE`] (30), a single TUI page
+    /// can straddle two HN pages. Both are fetched and merged so every
+    /// row that has vote data available gets an arrow.
+    pub fn get_listing_vote_state(
+        &self,
+        tag: &str,
+        sort_mode: StorySortMode,
+        page: usize,
+    ) -> Result<HashMap<u32, VoteData>> {
+        let Some(path) = listing_path_for_view(tag, sort_mode) else {
             return Ok(HashMap::new());
         };
-        let url = format!(
-            "{HN_HOST_URL}/{path}?p={}{}",
-            page + 1,
-            showdead_query_suffix("&")
-        );
-        let content = log!(
-            self.client.get(&url).call()?.into_string()?,
-            format!("fetch listing vote state (tag={tag}, page={page}) using {url}")
-        );
-        let map = parse_vote_data_from_content(&content)?;
-        Ok(map
-            .into_iter()
-            .filter_map(|(k, v)| k.parse::<u32>().ok().map(|id| (id, v)))
-            .collect())
+        let (first_hn_page, last_hn_page) = hn_listing_pages_for_tui_page(page);
+        let mut merged = HashMap::new();
+        for hn_page in first_hn_page..=last_hn_page {
+            let url = format!(
+                "{HN_HOST_URL}/{path}?p={hn_page}{}",
+                showdead_query_suffix("&")
+            );
+            let content = log!(
+                self.client.get(&url).call()?.into_string()?,
+                format!(
+                    "fetch listing vote state (tag={tag}, sort_mode={sort_mode:?}, tui_page={page}, hn_page={hn_page}) using {url}"
+                )
+            );
+            let map = parse_vote_data_from_content(&content)?;
+            merged.extend(
+                map.into_iter()
+                    .filter_map(|(k, v)| k.parse::<u32>().ok().map(|id| (id, v))),
+            );
+        }
+        Ok(merged)
     }
 
     /// Apply (or rescind) a vote on a HN item.
@@ -739,25 +764,32 @@ impl HNClient {
     pub fn get_listing_vouch_state(
         &self,
         tag: &str,
+        sort_mode: StorySortMode,
         page: usize,
     ) -> Result<HashMap<u32, VouchData>> {
-        let Some(path) = listing_path_for_tag(tag) else {
+        let Some(path) = listing_path_for_view(tag, sort_mode) else {
             return Ok(HashMap::new());
         };
-        let url = format!(
-            "{HN_HOST_URL}/{path}?p={}{}",
-            page + 1,
-            showdead_query_suffix("&")
-        );
-        let content = log!(
-            self.client.get(&url).call()?.into_string()?,
-            format!("fetch listing vouch state (tag={tag}, page={page}) using {url}")
-        );
-        let map = parse_vouch_data_from_content(&content)?;
-        Ok(map
-            .into_iter()
-            .filter_map(|(k, v)| k.parse::<u32>().ok().map(|id| (id, v)))
-            .collect())
+        let (first_hn_page, last_hn_page) = hn_listing_pages_for_tui_page(page);
+        let mut merged = HashMap::new();
+        for hn_page in first_hn_page..=last_hn_page {
+            let url = format!(
+                "{HN_HOST_URL}/{path}?p={hn_page}{}",
+                showdead_query_suffix("&")
+            );
+            let content = log!(
+                self.client.get(&url).call()?.into_string()?,
+                format!(
+                    "fetch listing vouch state (tag={tag}, sort_mode={sort_mode:?}, tui_page={page}, hn_page={hn_page}) using {url}"
+                )
+            );
+            let map = parse_vouch_data_from_content(&content)?;
+            merged.extend(
+                map.into_iter()
+                    .filter_map(|(k, v)| k.parse::<u32>().ok().map(|id| (id, v))),
+            );
+        }
+        Ok(merged)
     }
 
     /// Vouch for (or unvouch) a dead HN item.
@@ -976,17 +1008,34 @@ fn showdead_query_suffix(sep: &str) -> String {
     }
 }
 
-/// Map an internal story-view tag to the HN listing path that shows the same
-/// set of items with vote links attached. Only the tags backed by an HN-side
-/// page are mapped; Algolia-based views (search, `story`/`job` listings,
-/// custom keymaps) return `None` and fall back to per-item lazy fetches.
-fn listing_path_for_tag(tag: &str) -> Option<&'static str> {
-    match tag {
-        "front_page" => Some("news"),
-        "ask_hn" => Some("ask"),
-        "show_hn" => Some("show"),
+/// Map an internal story-view tag + sort mode to the HN listing path that
+/// shows the same set of items with vote links attached. Only the views
+/// backed by a stable HN-side page are mapped; Algolia-only views (search,
+/// `story` sorted by points, `job`, custom keymaps) return `None` and fall
+/// back to per-item lazy fetches.
+///
+/// The `story` tag sorted by date aligns with HN's `/newest` stream, so the
+/// F2 "story (by_date)" view picks up arrows via the listing sweep too.
+fn listing_path_for_view(tag: &str, sort_mode: StorySortMode) -> Option<&'static str> {
+    match (tag, sort_mode) {
+        ("front_page", _) => Some("news"),
+        ("ask_hn", _) => Some("ask"),
+        ("show_hn", _) => Some("show"),
+        ("story", StorySortMode::Date) => Some("newest"),
         _ => None,
     }
+}
+
+/// The inclusive range of HN listing pages (1-indexed, 30 items per page)
+/// that together cover the items shown on a given TUI page (0-indexed,
+/// [`STORY_LIMIT`] items per page). A TUI page spans at most 2 HN listing
+/// pages because [`STORY_LIMIT`] < [`HN_LISTING_PAGE_SIZE`].
+fn hn_listing_pages_for_tui_page(page: usize) -> (usize, usize) {
+    let start_item = STORY_LIMIT * page;
+    let end_item = STORY_LIMIT * (page + 1) - 1;
+    let first = start_item / HN_LISTING_PAGE_SIZE + 1;
+    let last = end_item / HN_LISTING_PAGE_SIZE + 1;
+    (first, last)
 }
 
 /// A snapshot of HN's edit form for a comment: the per-request `hmac`
@@ -1480,29 +1529,62 @@ pub fn verify_credentials(username: &str, password: &str) -> Result<Option<Strin
 #[cfg(test)]
 mod tests {
     use super::{
-        classify_login_response, listing_path_for_tag, parse_comments_from_content,
-        parse_karma_from_profile, parse_reply_form, parse_showdead_from_profile,
-        parse_topcolor_from_profile, parse_vote_data_from_content, parse_vouch_data_from_content,
-        StartupLoginStatus,
+        classify_login_response, hn_listing_pages_for_tui_page, listing_path_for_view,
+        parse_comments_from_content, parse_karma_from_profile, parse_reply_form,
+        parse_showdead_from_profile, parse_topcolor_from_profile, parse_vote_data_from_content,
+        parse_vouch_data_from_content, StartupLoginStatus, StorySortMode,
     };
     use crate::model::VoteDirection;
 
     #[test]
-    fn listing_path_maps_hn_backed_tags() {
-        assert_eq!(listing_path_for_tag("front_page"), Some("news"));
-        assert_eq!(listing_path_for_tag("ask_hn"), Some("ask"));
-        assert_eq!(listing_path_for_tag("show_hn"), Some("show"));
+    fn listing_path_maps_hn_backed_views() {
+        assert_eq!(
+            listing_path_for_view("front_page", StorySortMode::None),
+            Some("news")
+        );
+        assert_eq!(
+            listing_path_for_view("ask_hn", StorySortMode::None),
+            Some("ask")
+        );
+        assert_eq!(
+            listing_path_for_view("show_hn", StorySortMode::None),
+            Some("show")
+        );
+        // `story` by date corresponds to HN's /newest stream, so F2 picks
+        // up listing vote state just like the other tag views.
+        assert_eq!(
+            listing_path_for_view("story", StorySortMode::Date),
+            Some("newest")
+        );
     }
 
     #[test]
-    fn listing_path_returns_none_for_algolia_only_tags() {
-        // These views come from Algolia search with arbitrary sort/filter, so
-        // there's no single HN page that renders the same items. Callers fall
-        // back to the lazy per-item vote fetch.
-        assert_eq!(listing_path_for_tag("story"), None);
-        assert_eq!(listing_path_for_tag("job"), None);
-        assert_eq!(listing_path_for_tag("custom_whatever"), None);
-        assert_eq!(listing_path_for_tag(""), None);
+    fn listing_path_returns_none_for_algolia_only_views() {
+        // These views come from Algolia search with arbitrary sort/filter
+        // that has no direct HN listing equivalent, so callers fall back
+        // to the lazy per-item vote fetch.
+        assert_eq!(listing_path_for_view("story", StorySortMode::Points), None);
+        assert_eq!(listing_path_for_view("story", StorySortMode::None), None);
+        assert_eq!(listing_path_for_view("job", StorySortMode::Date), None);
+        assert_eq!(
+            listing_path_for_view("custom_whatever", StorySortMode::None),
+            None
+        );
+        assert_eq!(listing_path_for_view("", StorySortMode::None), None);
+    }
+
+    #[test]
+    fn hn_listing_pages_cover_tui_window() {
+        // TUI pages are 20 items; HN listing pages are 30. Every TUI page
+        // spans 1 or 2 HN pages — sweeping this range is how pagination
+        // beyond page 0 keeps vote arrows visible.
+        assert_eq!(hn_listing_pages_for_tui_page(0), (1, 1)); // items 0-19
+        assert_eq!(hn_listing_pages_for_tui_page(1), (1, 2)); // items 20-39 straddle HN p1+p2
+        assert_eq!(hn_listing_pages_for_tui_page(2), (2, 2)); // items 40-59
+        assert_eq!(hn_listing_pages_for_tui_page(3), (3, 3)); // items 60-79
+        assert_eq!(hn_listing_pages_for_tui_page(4), (3, 4)); // items 80-99 straddle p3+p4
+        assert_eq!(hn_listing_pages_for_tui_page(5), (4, 4)); // items 100-119
+        assert_eq!(hn_listing_pages_for_tui_page(6), (5, 5)); // items 120-139
     }
 
     #[test]

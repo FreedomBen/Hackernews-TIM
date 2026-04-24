@@ -43,11 +43,11 @@ pub fn construct_story_view_async(
             // swallowed: missing arrows is better than a blank error.
             let (stories_result, vote_state) = rayon::join(
                 || client.get_stories_by_tag(tag, sort_mode, page, numeric_filters),
-                || match client.get_listing_vote_state(tag, page) {
+                || match client.get_listing_vote_state(tag, sort_mode, page) {
                     Ok(map) => map,
                     Err(err) => {
                         warn!(
-                            "failed to prefetch listing vote state (tag={tag}, page={page}): {err}"
+                            "failed to prefetch listing vote state (tag={tag}, sort_mode={sort_mode:?}, page={page}): {err}"
                         );
                         HashMap::new()
                     }

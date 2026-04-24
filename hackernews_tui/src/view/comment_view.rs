@@ -553,15 +553,18 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
         // Exit find-on-page: clear tracked matches so `n`/`N` revert to
         // their default comment-navigation bindings. Returns `None` when
         // no session is active so Esc keeps its usual meaning elsewhere.
-        .on_pre_event_inner(config::get_global_keymap().close_dialog.clone(), move |_, _| {
-            let mut state = find_state_for_esc.borrow_mut();
-            if state.match_ids.is_empty() {
-                return None;
-            }
-            state.match_ids.clear();
-            state.pending = Some(FindSignal::Clear);
-            Some(EventResult::Consumed(None))
-        })
+        .on_pre_event_inner(
+            config::get_global_keymap().close_dialog.clone(),
+            move |_, _| {
+                let mut state = find_state_for_esc.borrow_mut();
+                if state.match_ids.is_empty() {
+                    return None;
+                }
+                state.match_ids.clear();
+                state.pending = Some(FindSignal::Clear);
+                Some(EventResult::Consumed(None))
+            },
+        )
         // Context-dependent match navigation: `n`/`N` jump between find
         // matches when a session is active, otherwise fall through to the
         // existing next/prev_top_level_comment bindings below.
@@ -587,9 +590,7 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
         // event also matches `find_next_match`, step aside so the match
         // jump doesn't land on a stale focus.
         .on_pre_event_inner(comment_view_keymap.next_top_level_comment, move |s, e| {
-            if find_next_for_ntl.has_event(e)
-                && !find_state_for_ntl.borrow().match_ids.is_empty()
-            {
+            if find_next_for_ntl.has_event(e) && !find_state_for_ntl.borrow().match_ids.is_empty() {
                 return None;
             }
             let id = s.get_focus_index();
@@ -597,9 +598,7 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
             s.set_focus_index(next_id)
         })
         .on_pre_event_inner(comment_view_keymap.prev_top_level_comment, move |s, e| {
-            if find_prev_for_ptl.has_event(e)
-                && !find_state_for_ptl.borrow().match_ids.is_empty()
-            {
+            if find_prev_for_ptl.has_event(e) && !find_state_for_ptl.borrow().match_ids.is_empty() {
                 return None;
             }
             let id = s.get_focus_index();

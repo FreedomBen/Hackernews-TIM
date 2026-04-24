@@ -276,8 +276,9 @@ fn construct_search_main_view(client: &'static client::HNClient, cb_sink: CbSink
         // Exit find-on-page: clear tracked matches so `n`/`N` revert to
         // their default paging bindings. Only meaningful in Navigation
         // mode; in Search mode Esc already switches modes elsewhere.
-        .on_pre_event_inner(config::get_global_keymap().close_dialog.clone(), |s, _| {
-            match s.mode {
+        .on_pre_event_inner(
+            config::get_global_keymap().close_dialog.clone(),
+            |s, _| match s.mode {
                 SearchViewMode::Navigation => {
                     let mut state = s.find_state.borrow_mut();
                     if state.match_ids.is_empty() {
@@ -288,8 +289,8 @@ fn construct_search_main_view(client: &'static client::HNClient, cb_sink: CbSink
                     Some(EventResult::Consumed(None))
                 }
                 SearchViewMode::Search => None,
-            }
-        })
+            },
+        )
         // Context-dependent match nav: `n`/`N` jump between matches
         // when a find session is active, else fall through to paging.
         // Registered before `next_page`/`prev_page` so match-nav wins
@@ -340,8 +341,7 @@ fn construct_search_main_view(client: &'static client::HNClient, cb_sink: CbSink
             let find_next_trigger = story_view_keymap.find_next_match.clone();
             move |s, e| match s.mode {
                 SearchViewMode::Navigation => {
-                    if find_next_trigger.has_event(e)
-                        && !s.find_state.borrow().match_ids.is_empty()
+                    if find_next_trigger.has_event(e) && !s.find_state.borrow().match_ids.is_empty()
                     {
                         return None;
                     }
@@ -356,8 +356,7 @@ fn construct_search_main_view(client: &'static client::HNClient, cb_sink: CbSink
             let find_prev_trigger = story_view_keymap.find_prev_match.clone();
             move |s, e| match s.mode {
                 SearchViewMode::Navigation => {
-                    if find_prev_trigger.has_event(e)
-                        && !s.find_state.borrow().match_ids.is_empty()
+                    if find_prev_trigger.has_event(e) && !s.find_state.borrow().match_ids.is_empty()
                     {
                         return None;
                     }

@@ -210,8 +210,8 @@ For more information about configuring the application's key mappings or definin
 | `prev_page`                    | Go the previous page                                                               | `p`              |
 | `cycle_sort_mode`              | Cycle story sort mode                                                              | `d`              |
 | `find_in_view`                 | Find on page: highlight matching stories (enter jumps to next, esc clears)         | `[/, C-f]`       |
-| `find_next_match`              | Jump to next find match (when a find session is active)                            | `n`              |
-| `find_prev_match`              | Jump to previous find match (when a find session is active)                        | `N`              |
+| `find_next_match`              | Jump to next find match (during a find session; esc exits)                            | `n`              |
+| `find_prev_match`              | Jump to previous find match (during a find session; esc exits)                        | `N`              |
 
 #### Article View shortcuts
 
@@ -222,8 +222,8 @@ For more information about configuring the application's key mappings or definin
 | `open_link_in_article_view` | Open in article view {link_id}-th link | `{link_id} O`    |
 | `open_link_dialog`          | Open link dialog                       | `l`              |
 | `find_in_view`              | Find on page: highlight matches in the article (enter jumps to next, esc clears) | `[/, C-f]` |
-| `find_next_match`           | Jump to next find match (when a find session is active)     | `n`              |
-| `find_prev_match`           | Jump to previous find match (when a find session is active) | `N`              |
+| `find_next_match`           | Jump to next find match (during a find session; esc exits)     | `n`              |
+| `find_prev_match`           | Jump to previous find match (during a find session; esc exits) | `N`              |
 
 ##### Link dialog shortcuts
 
@@ -247,8 +247,8 @@ For more information about configuring the application's key mappings or definin
 | `parent_comment`               | Focus the parent comment (if exists)                                            | `u`              |
 | `toggle_collapse_comment`      | Toggle collapsing the focused item                                              | `tab`            |
 | `find_in_view`                 | Find on page: highlight matching comments (enter jumps to next, esc clears)     | `[/, C-f]`       |
-| `find_next_match`              | Jump to next find match (when a find session is active)                         | `n`              |
-| `find_prev_match`              | Jump to previous find match (when a find session is active)                     | `N`              |
+| `find_next_match`              | Jump to next find match (during a find session; esc exits)                         | `n`              |
+| `find_prev_match`              | Jump to previous find match (during a find session; esc exits)                     | `N`              |
 | `upvote`                       | Toggle upvoting the focused item (**requires [authentication](#authentication)**) | `v`              |
 | `downvote`                     | Toggle downvoting the focused item (**requires downvote privilege**)            | `V`              |
 | `reply`                        | Reply to the focused item in `$EDITOR` (**requires [authentication](#authentication)**) | `r`        |

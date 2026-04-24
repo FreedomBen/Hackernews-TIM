@@ -630,6 +630,7 @@ pub fn construct_story_view(
     let find_state = find_bar::FindState::new_ref();
     let find_state_for_next = find_state.clone();
     let find_state_for_prev = find_state.clone();
+    let find_state_for_esc = find_state.clone();
     let main_view = construct_story_main_view(
         stories,
         client,
@@ -661,6 +662,18 @@ pub fn construct_story_view(
     OnEventView::new(view)
         .on_pre_event(config::get_global_keymap().open_help_dialog.clone(), |s| {
             s.add_layer(StoryView::construct_on_event_help_view())
+        })
+        // Exit find-on-page: clear tracked matches so `n`/`N` revert to
+        // their default paging bindings. Returns `None` when no session
+        // is active so Esc keeps its usual meaning elsewhere.
+        .on_pre_event_inner(config::get_global_keymap().close_dialog.clone(), move |_, _| {
+            let mut state = find_state_for_esc.borrow_mut();
+            if state.match_ids.is_empty() {
+                return None;
+            }
+            state.match_ids.clear();
+            state.pending = Some(FindSignal::Clear);
+            Some(EventResult::Consumed(None))
         })
         // Context-dependent match navigation: when a find session is
         // active, `n`/`N` jump between matches; otherwise they fall

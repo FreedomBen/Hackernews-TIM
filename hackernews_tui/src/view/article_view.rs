@@ -256,6 +256,7 @@ fn construct_article_main_view(
     let find_state_for_key = find_state.clone();
     let find_state_for_next = find_state.clone();
     let find_state_for_prev = find_state.clone();
+    let find_state_for_esc = find_state.clone();
 
     OnEventView::new(ArticleView::new(article, find_state))
         .on_pre_event_inner(EventTrigger::from_fn(|_| true), move |s, e| {
@@ -314,6 +315,18 @@ fn construct_article_main_view(
                 state.pending = Some(FindSignal::Clear);
             }
             s.add_layer(find_bar::construct_find_dialog(find_state_for_key.clone()));
+        })
+        // Exit find-on-page: clear tracked matches so `n`/`N` revert to
+        // their default bindings. Returns `None` when no session is
+        // active so Esc keeps its usual meaning elsewhere.
+        .on_pre_event_inner(config::get_global_keymap().close_dialog.clone(), move |_, _| {
+            let mut state = find_state_for_esc.borrow_mut();
+            if state.match_ids.is_empty() {
+                return None;
+            }
+            state.match_ids.clear();
+            state.pending = Some(FindSignal::Clear);
+            Some(EventResult::Consumed(None))
         })
         // Context-dependent match nav: `n`/`N` jump between matches
         // only while a find session is active. Registered as

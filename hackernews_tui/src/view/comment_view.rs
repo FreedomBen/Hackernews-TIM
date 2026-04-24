@@ -456,6 +456,7 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
     let find_state_for_key = find_state.clone();
     let find_state_for_next = find_state.clone();
     let find_state_for_prev = find_state.clone();
+    let find_state_for_esc = find_state.clone();
 
     OnEventView::new(CommentView::new(data, find_state))
         .on_pre_event_inner(EventTrigger::from_fn(|_| true), move |s, e| {
@@ -544,6 +545,18 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
             let next_id =
                 s.find_item_id_by_max_level(id, s.items[id].level, NavigationDirection::Previous);
             s.set_focus_index(next_id)
+        })
+        // Exit find-on-page: clear tracked matches so `n`/`N` revert to
+        // their default comment-navigation bindings. Returns `None` when
+        // no session is active so Esc keeps its usual meaning elsewhere.
+        .on_pre_event_inner(config::get_global_keymap().close_dialog.clone(), move |_, _| {
+            let mut state = find_state_for_esc.borrow_mut();
+            if state.match_ids.is_empty() {
+                return None;
+            }
+            state.match_ids.clear();
+            state.pending = Some(FindSignal::Clear);
+            Some(EventResult::Consumed(None))
         })
         // Context-dependent match navigation: `n`/`N` jump between find
         // matches when a session is active, otherwise fall through to the

@@ -43,8 +43,11 @@ with the same legacy-file migration as
 .BI \-l\ FOLDER ",\ \-\-log\ " FOLDER
 Folder in which to write the log file
 .RB ( hn-tui.log ).
-Defaults to the user's cache directory. The folder is created if it
-does not exist.
+Defaults to the
+.B hackernews-tim
+subdirectory of the user's cache directory
+.RI ( $XDG_CACHE_HOME/hackernews-tim ).
+The folder is created if it does not exist.
 .TP
 .BI \-i\ ID
 The Hacker News item id to start the application with. When set,
@@ -182,7 +185,7 @@ can remove it when they are ready.
 .I $XDG_CONFIG_HOME/hn-auth.toml ",\ " $HOME/.config/hn-auth.toml
 Legacy authentication paths, migrated the same way.
 .TP
-.I $XDG_CACHE_HOME/hn-tui.log
+.I $XDG_CACHE_HOME/hackernews-tim/hn-tui.log
 Default log file.
 .TP
 .I PREFIX/share/hackernews_tim/examples/hn-tui.toml

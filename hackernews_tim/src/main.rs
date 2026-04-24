@@ -133,10 +133,11 @@ fn init_app_dirs() -> (
     Vec<std::path::PathBuf>,
 ) {
     let xdg_config_dir = dirs_next::config_dir().expect("failed to get user's config dir");
-    let cache_dir = dirs_next::cache_dir().expect("failed to get user's cache dir");
+    let xdg_cache_dir = dirs_next::cache_dir().expect("failed to get user's cache dir");
     let home_dir = dirs_next::home_dir().expect("failed to get user's home dir");
 
     let app_config_dir = xdg_config_dir.join(APP_CONFIG_SUBDIR);
+    let app_cache_dir = xdg_cache_dir.join(APP_CONFIG_SUBDIR);
 
     // Directories where older versions stored `hn-tui.toml` / `hn-auth.toml`
     // directly. Used once at startup to migrate pre-subdir configs into the
@@ -148,7 +149,7 @@ fn init_app_dirs() -> (
         legacy_dirs.push(dot_config);
     }
 
-    (app_config_dir, cache_dir, legacy_dirs)
+    (app_config_dir, app_cache_dir, legacy_dirs)
 }
 
 fn init_auth(auth_path: &std::path::Path) -> Option<config::Auth> {
@@ -283,8 +284,8 @@ fn build_client_and_log_in(
 }
 
 fn main() {
-    let (app_config_dir, cache_dir, legacy_dirs) = init_app_dirs();
-    let args = parse_args(app_config_dir, cache_dir);
+    let (app_config_dir, app_cache_dir, legacy_dirs) = init_app_dirs();
+    let args = parse_args(app_config_dir, app_cache_dir);
 
     init_logging(
         args.get_one::<String>("log")

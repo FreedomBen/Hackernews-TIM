@@ -358,7 +358,7 @@ next run.
 
 `Hackernews-TIM` uses `RUST_LOG` environment variable to define the application's [logging level](https://docs.rs/log/0.4.14/log/enum.Level.html) (default to be `INFO`).
 
-By default, the application creates the `hn-tui.log` log file inside the [user's cache directory](https://docs.rs/dirs-next/latest/dirs_next/fn.cache_dir.html), which can be configured by specifying the `-l` or `--log` option.
+By default, the application creates the `hn-tui.log` log file inside the `hackernews-tim` subdirectory of the [user's cache directory](https://docs.rs/dirs-next/latest/dirs_next/fn.cache_dir.html) (e.g. `~/.cache/hackernews-tim/hn-tui.log` on Linux). The folder is created if it doesn't already exist, and the full path can be overridden with `-l` or `--log`.
 
 ## Roadmap
 

@@ -20,6 +20,15 @@ pub const MIN_PAGE_SIZE: usize = 5;
 pub const MAX_PAGE_SIZE: usize = 100;
 pub const DEFAULT_PAGE_SIZE: usize = 20;
 
+/// Inclusive bounds for [`Config::search_page_size`]. The search view
+/// is Algolia-only (no Firebase listing reconciliation), but a larger
+/// cap here would overflow the terminal viewport with match previews
+/// while offering little value — search results are usually winnowed
+/// down by query, not by paging.
+pub const MIN_SEARCH_PAGE_SIZE: usize = 5;
+pub const MAX_SEARCH_PAGE_SIZE: usize = 30;
+pub const DEFAULT_SEARCH_PAGE_SIZE: usize = 15;
+
 #[derive(Debug, Deserialize, ConfigParse)]
 /// Config is a struct storing the application's configurations
 pub struct Config {
@@ -30,6 +39,10 @@ pub struct Config {
     /// Number of stories per TUI listing page. Clamped to
     /// [`MIN_PAGE_SIZE`]..=[`MAX_PAGE_SIZE`] on read via [`page_size`].
     pub page_size: u64,
+    /// Number of results per search-view page. Clamped to
+    /// [`MIN_SEARCH_PAGE_SIZE`]..=[`MAX_SEARCH_PAGE_SIZE`] on read via
+    /// [`search_page_size`].
+    pub search_page_size: u64,
     pub url_open_command: Command,
     pub article_parse_command: Command,
 
@@ -91,6 +104,7 @@ impl Default for Config {
             },
             client_timeout: 32,
             page_size: DEFAULT_PAGE_SIZE as u64,
+            search_page_size: DEFAULT_SEARCH_PAGE_SIZE as u64,
             theme: theme::Theme::default(),
             keymap: keybindings::KeyMap::default(),
         }
@@ -250,6 +264,16 @@ pub fn page_size() -> usize {
 
 pub(crate) fn clamp_page_size(raw: usize) -> usize {
     raw.clamp(MIN_PAGE_SIZE, MAX_PAGE_SIZE)
+}
+
+/// Results per search-view page, clamped to
+/// [`MIN_SEARCH_PAGE_SIZE`]..=[`MAX_SEARCH_PAGE_SIZE`].
+pub fn search_page_size() -> usize {
+    clamp_search_page_size(get_config().search_page_size as usize)
+}
+
+pub(crate) fn clamp_search_page_size(raw: usize) -> usize {
+    raw.clamp(MIN_SEARCH_PAGE_SIZE, MAX_SEARCH_PAGE_SIZE)
 }
 
 #[cfg(test)]

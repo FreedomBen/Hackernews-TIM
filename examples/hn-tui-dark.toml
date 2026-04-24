@@ -20,6 +20,8 @@ client_timeout = 32
 # vote-state prefetch on HN-backed tags (front_page, ask_hn, show_hn,
 # newest). Default is 20.
 page_size = 20
+# Number of results per search-view page. Clamped to 5..=30. Default is 15.
+search_page_size = 15
 
 # ---------------------------------
 # theme

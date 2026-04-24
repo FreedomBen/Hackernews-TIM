@@ -164,7 +164,7 @@ impl SearchView {
             state.pending = Some(FindSignal::Clear);
         }
         self.view.remove_child(1);
-        let starting_id = client::SEARCH_LIMIT * self.page;
+        let starting_id = config::search_page_size() * self.page;
         self.view.add_child(
             story_view::construct_story_main_view(
                 stories,

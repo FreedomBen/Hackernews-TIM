@@ -26,7 +26,6 @@ pub const HN_HOST_URL: &str = "https://news.ycombinator.com";
 /// the two must sweep the range returned by
 /// [`hn_listing_pages_for_tui_page`].
 const HN_LISTING_PAGE_SIZE: usize = 30;
-pub const SEARCH_LIMIT: usize = 15;
 
 static CLIENT: once_cell::sync::OnceCell<HNClient> = once_cell::sync::OnceCell::new();
 
@@ -386,7 +385,7 @@ impl HNClient {
             HN_ALGOLIA_PREFIX,
             if by_date { "search_by_date" } else { "search" },
             HN_SEARCH_QUERY_STRING,
-            SEARCH_LIMIT,
+            config::search_page_size(),
             page
         );
         let response = log!(
@@ -1644,6 +1643,18 @@ mod tests {
         assert_eq!(clamp_page_size(100), 100);
         assert_eq!(clamp_page_size(101), MAX_PAGE_SIZE);
         assert_eq!(clamp_page_size(10_000), MAX_PAGE_SIZE);
+    }
+
+    #[test]
+    fn clamp_search_page_size_keeps_values_within_bounds() {
+        use crate::config::{clamp_search_page_size, MAX_SEARCH_PAGE_SIZE, MIN_SEARCH_PAGE_SIZE};
+        assert_eq!(clamp_search_page_size(0), MIN_SEARCH_PAGE_SIZE);
+        assert_eq!(clamp_search_page_size(4), MIN_SEARCH_PAGE_SIZE);
+        assert_eq!(clamp_search_page_size(5), 5);
+        assert_eq!(clamp_search_page_size(15), 15);
+        assert_eq!(clamp_search_page_size(30), 30);
+        assert_eq!(clamp_search_page_size(31), MAX_SEARCH_PAGE_SIZE);
+        assert_eq!(clamp_search_page_size(1_000), MAX_SEARCH_PAGE_SIZE);
     }
 
     #[test]

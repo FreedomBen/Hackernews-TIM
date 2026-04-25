@@ -882,16 +882,25 @@ impl HNClient {
     /// Post a reply to a HN item.
     ///
     /// HN's reply flow is cookie-authenticated and CSRF-protected: we GET
-    /// `/reply?id=<parent>` to scrape the per-request `hmac` token (plus the
+    /// `/item?id=<parent>` to scrape the per-request `hmac` token (plus the
     /// `goto` redirect target), then POST the body to `/comment` along with
-    /// the session cookies carried by [`self.client`]. If the user isn't
-    /// logged in, HN redirects the GET to its login page and the form lookup
-    /// fails — we surface that as an explicit error instead of a silent noop.
-    /// An empty response body (HN occasionally serves one for locked/dead
-    /// items or transient hiccups) is also distinguished so a retry-or-investigate
-    /// hint reaches the user.
+    /// the session cookies carried by [`self.client`].
+    ///
+    /// We deliberately scrape from `/item` rather than `/reply`. HN's
+    /// `/reply?id=<X>` page only renders a form when `X` is a comment — for a
+    /// story id it serves a 200 with an empty body (top-level replies are
+    /// expected to come from the inline textarea on the story page itself).
+    /// `/item?id=<X>` renders the same hmac-bearing comment form for both
+    /// stories and comments, so a single endpoint covers both reply shapes.
+    ///
+    /// If the user isn't logged in, HN redirects the GET to its login page
+    /// and the form lookup fails — we surface that as an explicit error
+    /// instead of a silent noop. An empty response body (transient hiccup,
+    /// item HN refuses to render) and an item that renders without a comment
+    /// box (locked/dead/archived) are also distinguished so the user gets
+    /// actionable advice instead of a generic "form missing" string.
     pub fn post_reply(&self, parent_id: u32, text: &str) -> Result<()> {
-        let page_url = format!("{HN_HOST_URL}/reply?id={parent_id}");
+        let page_url = format!("{HN_HOST_URL}/item?id={parent_id}");
         let response = self
             .client
             .get(&page_url)
@@ -907,7 +916,7 @@ impl HNClient {
                 String::new()
             } else {
                 let dump_path =
-                    std::env::temp_dir().join(format!("hn-reply-response-{parent_id}.html"));
+                    std::env::temp_dir().join(format!("hn-item-response-{parent_id}.html"));
                 match std::fs::write(&dump_path, &page_body) {
                     Ok(()) => format!(
                         " (response body saved to {} for inspection)",
@@ -924,13 +933,18 @@ impl HNClient {
             )
         })?;
         let parent = parent_id.to_string();
+        // Match the `goto` value HN renders inside the form. The previous
+        // /reply-based path sent goto="" because /reply rendered an empty
+        // goto input; on /item the input carries the item URL, and we
+        // mirror it so our POST shape matches a browser's.
+        let goto = format!("item?id={parent_id}");
         let comment_url = format!("{HN_HOST_URL}/comment");
         let response_body = self
             .client
             .post(&comment_url)
             .send_form(&[
                 ("parent", parent.as_str()),
-                ("goto", ""),
+                ("goto", goto.as_str()),
                 ("hmac", hmac.as_str()),
                 ("text", text),
             ])
@@ -1099,19 +1113,21 @@ fn parse_reply_form(body: &str) -> Option<String> {
 ///
 /// Three shapes are distinguished so the user gets actionable advice instead
 /// of a generic "form missing" string:
-/// - Empty body — HN returned nothing (transient hiccup, locked/dead item, etc.).
+/// - Empty body — HN returned nothing (transient hiccup; uncommon on /item).
 /// - Login form — session cookie has gone stale.
-/// - Anything else — HN's markup may have drifted.
+/// - Anything else — the item rendered but without a comment box, which
+///   typically means HN won't accept replies (locked/dead/archived item),
+///   or HN's markup has drifted.
 fn classify_missing_reply_form(body: &str) -> &'static str {
     if body.trim().is_empty() {
-        "HN returned an empty response — likely a transient hiccup, or the item is \
-         locked/dead. Try again, or open the item in a browser to confirm replies are open"
+        "HN returned an empty response — likely a transient hiccup; try again"
     } else if body.contains(r#"name="acct""#) || body.contains(r#"name='acct'"#) {
         "HN redirected the GET to its login page — the cached session is probably stale. \
          Try deleting the `session` line in hn-auth.toml and restarting, or re-paste a \
          fresh cookie"
     } else {
-        "hmac field missing, or HN changed its markup"
+        "no comment box on the item page — replies may be disabled (locked, dead, or \
+         archived item), or HN changed its markup"
     }
 }
 
@@ -2162,11 +2178,11 @@ mod tests {
     }
 
     #[test]
-    fn classify_missing_reply_form_falls_back_to_markup_drift() {
+    fn classify_missing_reply_form_falls_back_to_locked_or_drift() {
         let cause = classify_missing_reply_form("<html><body>hello</body></html>");
         assert!(
-            cause.contains("hmac field missing"),
-            "expected markup-drift cause, got {cause:?}"
+            cause.contains("locked") && cause.contains("comment box"),
+            "expected locked/markup-drift cause, got {cause:?}"
         );
     }
 

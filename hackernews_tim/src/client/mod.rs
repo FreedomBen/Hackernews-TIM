@@ -13,6 +13,9 @@ use crate::{prelude::*, utils::decode_html};
 mod model;
 mod query;
 
+#[cfg(any(test, feature = "test-support"))]
+pub mod fake;
+
 const HN_ALGOLIA_PREFIX: &str = "https://hn.algolia.com/api/v1";
 const HN_OFFICIAL_PREFIX: &str = "https://hacker-news.firebaseio.com/v0";
 const HN_SEARCH_QUERY_STRING: &str =

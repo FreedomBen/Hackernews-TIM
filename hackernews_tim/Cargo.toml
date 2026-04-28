@@ -10,6 +10,12 @@ keywords = ["hackernews", "tui"]
 readme = "../README.md"
 include = ["src/**/*", "LICENSE", "../README.*", "!**/examples/**/*"]
 
+[features]
+# Exposes in-memory test doubles (e.g. `client::fake::FakeHnApi`) to
+# integration tests under `tests/`. Always available in `cfg(test)` for
+# the binary crate's own unit tests.
+test-support = []
+
 [dependencies]
 
 # cursive related deps

@@ -32,7 +32,7 @@ truth for individual cases.
 - [x] 1.1 `client/query.rs` — URL/query construction
 - [x] 1.2 `client/mod.rs` — additional private helpers
 - [x] 1.3 `config/keybindings.rs` — typed key parsing
-- [ ] 1.4 `parser/html.rs` — HN comment HTML rendering
+- [x] 1.4 `parser/html.rs` — HN comment HTML rendering
 - [ ] 1.5 `parser/article.rs` + `parser/rcdom.rs` — reader-mode rendering
 - [ ] 1.6 `utils.rs` — formatting helpers
 - [ ] 1.7 `reply_editor.rs` — scaffold I/O

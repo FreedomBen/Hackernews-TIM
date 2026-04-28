@@ -492,6 +492,15 @@ pub fn get_config() -> &'static Config {
     CONFIG.get().unwrap()
 }
 
+/// Idempotently install [`Config::default`] into the global so tests that
+/// call into code paths reading `get_config_theme()` etc. don't panic. Safe
+/// to call from many test modules; the first caller wins and the rest are
+/// no-ops because all tests share the same default config snapshot.
+#[cfg(test)]
+pub(crate) fn init_test_config() {
+    let _ = CONFIG.set(Config::default());
+}
+
 /// The story-listing page size, clamped to
 /// [`MIN_PAGE_SIZE`]..=[`MAX_PAGE_SIZE`]. Read lazily so a user-facing
 /// value out of range silently gets pulled into a working range rather

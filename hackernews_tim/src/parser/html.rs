@@ -156,3 +156,147 @@ fn parse(text: String, style: Style, base_link_id: usize) -> HTMLTextParsedResul
 
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config;
+
+    fn render(text: &str, base_link_id: usize) -> HTMLTextParsedResult {
+        // The parser reads the global theme; install defaults so the call
+        // doesn't panic when this test module runs in isolation.
+        config::init_test_config();
+        parse_hn_html_text(text.to_string(), Style::default(), base_link_id)
+    }
+
+    fn rendered_source(text: &str) -> String {
+        render(text, 0).content.source().to_string()
+    }
+
+    #[test]
+    fn plain_text_paragraph_has_no_links() {
+        let result = render("hello world", 0);
+        // Trailing newline is added by the paragraph branch wrapping the
+        // input in <p>...</p>.
+        assert_eq!(result.content.source(), "hello world\n");
+        assert!(result.links.is_empty());
+    }
+
+    #[test]
+    fn single_link_collected_with_marker() {
+        let result = render(r#"<p>see <a href="https://example.com">site</a></p>"#, 0);
+        assert_eq!(result.links, vec!["https://example.com".to_string()]);
+        let src = result.content.source();
+        // First link is numbered [1] when base_link_id == 0.
+        assert!(src.contains("[1]"), "expected [1] marker; got {src:?}");
+        assert!(src.contains("example.com"), "got {src:?}");
+    }
+
+    #[test]
+    fn base_link_id_offsets_marker() {
+        let result = render(r#"<p><a href="https://a.example">a</a></p>"#, 4);
+        // base_link_id = 4 → first link marker is [5].
+        let src = result.content.source();
+        assert!(src.contains("[5]"), "expected [5] marker; got {src:?}");
+        assert_eq!(result.links, vec!["https://a.example".to_string()]);
+    }
+
+    #[test]
+    fn multiple_links_numbered_sequentially() {
+        let result = render(
+            r#"<p><a href="https://one.example">one</a> and <a href="https://two.example">two</a> and <a href="https://three.example">three</a></p>"#,
+            0,
+        );
+        assert_eq!(
+            result.links,
+            vec![
+                "https://one.example".to_string(),
+                "https://two.example".to_string(),
+                "https://three.example".to_string(),
+            ]
+        );
+        let src = result.content.source();
+        assert!(src.contains("[1]"));
+        assert!(src.contains("[2]"));
+        assert!(src.contains("[3]"));
+    }
+
+    #[test]
+    fn pre_code_block_preserved_verbatim_with_whitespace() {
+        // The code-block branch passes the inner text through as-is, including
+        // multi-line indentation. Trailing newlines are stripped by the regex.
+        let src = rendered_source("<pre><code>fn main() {\n    println!(\"hi\");\n}</code></pre>");
+        assert!(
+            src.contains("fn main() {\n    println!(\"hi\");\n}"),
+            "got {src:?}"
+        );
+    }
+
+    #[test]
+    fn italic_tag_content_is_preserved() {
+        let src = rendered_source("<i>emphasis</i>");
+        assert!(src.contains("emphasis"), "got {src:?}");
+    }
+
+    #[test]
+    fn inline_code_backticks_are_consumed() {
+        // Markdown-style inline code uses backticks; the backticks themselves
+        // are not part of the rendered output, only the inner text is.
+        let src = rendered_source("see `foo` here");
+        assert!(src.contains("foo"), "got {src:?}");
+        assert!(!src.contains("`foo`"), "backticks should be stripped: {src:?}");
+    }
+
+    #[test]
+    fn link_inside_italic_is_not_recursed_into() {
+        // Italic content is appended verbatim — the parser doesn't recurse
+        // through `<i>...</i>`, so a link nested inside an italic tag is
+        // *not* lifted into the links list. This pins the current behaviour;
+        // a future change to recurse through styled tags would update this
+        // expectation.
+        let result = render(
+            r#"<p><i>see <a href="https://nested.example">it</a></i></p>"#,
+            0,
+        );
+        assert!(result.links.is_empty(), "got links {:?}", result.links);
+    }
+
+    #[test]
+    fn link_inside_paragraph_is_recursed_into() {
+        // Paragraphs *are* recursed into, so a link inside a `<p>` is
+        // extracted. Pair with the italic test above to triangulate the
+        // recurse-vs-passthrough boundary.
+        let result = render(
+            r#"<p>see <a href="https://outer.example">it</a></p>"#,
+            0,
+        );
+        assert_eq!(result.links, vec!["https://outer.example".to_string()]);
+    }
+
+    #[test]
+    fn empty_input_returns_empty_styled_string_and_no_links() {
+        let result = render("", 0);
+        assert_eq!(result.content.source(), "");
+        assert!(result.links.is_empty());
+    }
+
+    #[test]
+    fn whitespace_only_input_does_not_emit_links() {
+        let result = render("   ", 0);
+        assert!(result.links.is_empty());
+    }
+
+    #[test]
+    fn merge_appends_content_and_links() {
+        let mut a = render(r#"<p><a href="https://a.example">a</a></p>"#, 0);
+        let b = render(r#"<p><a href="https://b.example">b</a></p>"#, 0);
+        a.merge(b);
+        assert_eq!(
+            a.links,
+            vec![
+                "https://a.example".to_string(),
+                "https://b.example".to_string(),
+            ]
+        );
+    }
+}

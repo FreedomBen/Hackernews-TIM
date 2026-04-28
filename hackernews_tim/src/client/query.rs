@@ -136,3 +136,247 @@ impl std::fmt::Display for StoryNumericFilters {
         write!(f, "{}", self.desc())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- StorySortMode::next ---
+
+    #[test]
+    fn sort_mode_front_page_stays_none() {
+        assert_eq!(StorySortMode::None.next("front_page"), StorySortMode::None);
+    }
+
+    #[test]
+    #[should_panic(expected = "`front_page` stories should have no sort mode")]
+    fn sort_mode_front_page_date_panics() {
+        let _ = StorySortMode::Date.next("front_page");
+    }
+
+    #[test]
+    #[should_panic(expected = "`front_page` stories should have no sort mode")]
+    fn sort_mode_front_page_points_panics() {
+        let _ = StorySortMode::Points.next("front_page");
+    }
+
+    #[test]
+    fn sort_mode_story_cycles_date_points_only() {
+        assert_eq!(StorySortMode::Date.next("story"), StorySortMode::Points);
+        assert_eq!(StorySortMode::Points.next("story"), StorySortMode::Date);
+    }
+
+    #[test]
+    fn sort_mode_job_cycles_date_points_only() {
+        assert_eq!(StorySortMode::Date.next("job"), StorySortMode::Points);
+        assert_eq!(StorySortMode::Points.next("job"), StorySortMode::Date);
+    }
+
+    #[test]
+    #[should_panic(expected = "`story`/`job` stories should have a sort mode")]
+    fn sort_mode_story_none_panics() {
+        let _ = StorySortMode::None.next("story");
+    }
+
+    #[test]
+    #[should_panic(expected = "`story`/`job` stories should have a sort mode")]
+    fn sort_mode_job_none_panics() {
+        let _ = StorySortMode::None.next("job");
+    }
+
+    #[test]
+    fn sort_mode_ask_hn_cycles_none_date_points() {
+        assert_eq!(StorySortMode::None.next("ask_hn"), StorySortMode::Date);
+        assert_eq!(StorySortMode::Date.next("ask_hn"), StorySortMode::Points);
+        assert_eq!(StorySortMode::Points.next("ask_hn"), StorySortMode::None);
+    }
+
+    #[test]
+    fn sort_mode_show_hn_cycles_like_ask_hn() {
+        assert_eq!(StorySortMode::None.next("show_hn"), StorySortMode::Date);
+        assert_eq!(StorySortMode::Date.next("show_hn"), StorySortMode::Points);
+        assert_eq!(StorySortMode::Points.next("show_hn"), StorySortMode::None);
+    }
+
+    #[test]
+    fn sort_mode_custom_tag_cycles_like_ask_hn() {
+        assert_eq!(StorySortMode::None.next("custom"), StorySortMode::Date);
+        assert_eq!(StorySortMode::Date.next("custom"), StorySortMode::Points);
+        assert_eq!(StorySortMode::Points.next("custom"), StorySortMode::None);
+    }
+
+    // --- FilterInterval::query ---
+
+    fn interval(start: Option<u32>, end: Option<u32>) -> FilterInterval<u32> {
+        FilterInterval { start, end }
+    }
+
+    #[test]
+    fn filter_interval_query_empty_when_both_bounds_none() {
+        assert_eq!(interval(None, None).query("points"), "");
+    }
+
+    #[test]
+    fn filter_interval_query_start_only() {
+        assert_eq!(interval(Some(10), None).query("points"), ",points>=10");
+    }
+
+    #[test]
+    fn filter_interval_query_end_only() {
+        assert_eq!(interval(None, Some(50)).query("points"), ",points<50");
+    }
+
+    #[test]
+    fn filter_interval_query_both_bounds() {
+        assert_eq!(
+            interval(Some(10), Some(50)).query("points"),
+            ",points>=10,points<50"
+        );
+    }
+
+    // --- FilterInterval::desc ---
+
+    #[test]
+    fn filter_interval_desc_empty_bounds() {
+        assert_eq!(interval(None, None).desc("points"), "points: [:]");
+    }
+
+    #[test]
+    fn filter_interval_desc_start_only() {
+        assert_eq!(interval(Some(10), None).desc("points"), "points: [10:]");
+    }
+
+    #[test]
+    fn filter_interval_desc_end_only() {
+        assert_eq!(interval(None, Some(50)).desc("points"), "points: [:50]");
+    }
+
+    #[test]
+    fn filter_interval_desc_both_bounds() {
+        assert_eq!(
+            interval(Some(10), Some(50)).desc("points"),
+            "points: [10:50]"
+        );
+    }
+
+    // --- StoryNumericFilters ---
+
+    #[test]
+    fn story_numeric_filters_query_empty_when_no_intervals() {
+        assert_eq!(StoryNumericFilters::default().query(), "");
+    }
+
+    #[test]
+    fn story_numeric_filters_query_points_only() {
+        let filters = StoryNumericFilters {
+            elapsed_days_interval: FilterInterval::default(),
+            points_interval: FilterInterval {
+                start: Some(100),
+                end: None,
+            },
+            num_comments_interval: FilterInterval::default(),
+        };
+        assert_eq!(filters.query(), "&numericFilters=points>=100");
+    }
+
+    #[test]
+    fn story_numeric_filters_query_combines_points_and_comments() {
+        let filters = StoryNumericFilters {
+            elapsed_days_interval: FilterInterval::default(),
+            points_interval: FilterInterval {
+                start: Some(100),
+                end: None,
+            },
+            num_comments_interval: FilterInterval {
+                start: Some(5),
+                end: None,
+            },
+        };
+        assert_eq!(
+            filters.query(),
+            "&numericFilters=points>=100,num_comments>=5"
+        );
+    }
+
+    #[test]
+    fn story_numeric_filters_query_strips_leading_comma() {
+        // Internal accumulator uses leading commas; the prefix path must
+        // strip the very first one before emitting `&numericFilters=`.
+        let filters = StoryNumericFilters {
+            elapsed_days_interval: FilterInterval::default(),
+            points_interval: FilterInterval::default(),
+            num_comments_interval: FilterInterval {
+                start: Some(10),
+                end: Some(100),
+            },
+        };
+        let query = filters.query();
+        assert_eq!(
+            query,
+            "&numericFilters=num_comments>=10,num_comments<100"
+        );
+        assert!(!query.contains("=,"));
+    }
+
+    #[test]
+    fn story_numeric_filters_query_reverses_elapsed_days_into_created_at_i() {
+        // elapsed_days {start: 1, end: 7} = "stories from 1 to 7 days ago".
+        // That maps to created_at_i lower=now-7d, upper=now-1d — start/end
+        // swap when crossing from "elapsed" to "absolute" time.
+        let filters = StoryNumericFilters {
+            elapsed_days_interval: FilterInterval {
+                start: Some(1),
+                end: Some(7),
+            },
+            points_interval: FilterInterval::default(),
+            num_comments_interval: FilterInterval::default(),
+        };
+        let query = filters.query();
+        assert!(query.starts_with("&numericFilters=created_at_i>="));
+        let parts: Vec<&str> = query
+            .trim_start_matches("&numericFilters=")
+            .split(',')
+            .collect();
+        let lower: u64 = parts[0]
+            .trim_start_matches("created_at_i>=")
+            .parse()
+            .unwrap();
+        let upper: u64 = parts[1]
+            .trim_start_matches("created_at_i<")
+            .parse()
+            .unwrap();
+        assert_eq!(upper - lower, 6 * 24 * 60 * 60);
+    }
+
+    #[test]
+    fn story_numeric_filters_desc_concatenates_subdescriptions() {
+        let filters = StoryNumericFilters {
+            elapsed_days_interval: FilterInterval {
+                start: Some(1),
+                end: None,
+            },
+            points_interval: FilterInterval {
+                start: None,
+                end: Some(50),
+            },
+            num_comments_interval: FilterInterval::default(),
+        };
+        assert_eq!(
+            filters.desc(),
+            "elapsed_days: [1:], points: [:50], num_comments: [:]"
+        );
+    }
+
+    #[test]
+    fn story_numeric_filters_display_matches_desc() {
+        let filters = StoryNumericFilters {
+            elapsed_days_interval: FilterInterval::default(),
+            points_interval: FilterInterval {
+                start: Some(100),
+                end: None,
+            },
+            num_comments_interval: FilterInterval::default(),
+        };
+        assert_eq!(format!("{filters}"), filters.desc());
+    }
+}

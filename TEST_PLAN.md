@@ -29,7 +29,7 @@ truth for individual cases.
 
 ### Phase 1 (pure-logic tests)
 
-- [ ] 1.1 `client/query.rs` — URL/query construction
+- [x] 1.1 `client/query.rs` — URL/query construction
 - [ ] 1.2 `client/mod.rs` — additional private helpers
 - [ ] 1.3 `config/keybindings.rs` — typed key parsing
 - [ ] 1.4 `parser/html.rs` — HN comment HTML rendering

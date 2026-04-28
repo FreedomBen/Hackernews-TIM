@@ -244,8 +244,11 @@ impl HnApi for FakeHnApi {
 
     fn get_matched_stories(&self, query: &str, by_date: bool, page: usize) -> Result<Vec<Story>> {
         let mut s = self.state.lock().unwrap();
-        s.calls
-            .push(FakeCall::GetMatchedStories(query.to_string(), by_date, page));
+        s.calls.push(FakeCall::GetMatchedStories(
+            query.to_string(),
+            by_date,
+            page,
+        ));
         Ok(s.matched_stories
             .get(&(query.to_string(), by_date, page))
             .cloned()
@@ -271,8 +274,7 @@ impl HnApi for FakeHnApi {
 
     fn vote(&self, id: u32, auth: &str, new_vote: Option<VoteDirection>) -> Result<()> {
         let mut s = self.state.lock().unwrap();
-        s.calls
-            .push(FakeCall::Vote(id, auth.to_string(), new_vote));
+        s.calls.push(FakeCall::Vote(id, auth.to_string(), new_vote));
         if s.fail_vote {
             Err(anyhow!("FakeHnApi: vote failed (stub)"))
         } else {
@@ -282,8 +284,7 @@ impl HnApi for FakeHnApi {
 
     fn vouch(&self, id: u32, auth: &str, rescind: bool) -> Result<()> {
         let mut s = self.state.lock().unwrap();
-        s.calls
-            .push(FakeCall::Vouch(id, auth.to_string(), rescind));
+        s.calls.push(FakeCall::Vouch(id, auth.to_string(), rescind));
         if s.fail_vouch {
             Err(anyhow!("FakeHnApi: vouch failed (stub)"))
         } else {
@@ -408,7 +409,9 @@ mod tests {
     #[test]
     fn vote_records_direction_and_returns_failure_when_flagged() {
         let fake = FakeHnApi::new();
-        assert!(fake.vote(123, "auth-token", Some(VoteDirection::Up)).is_ok());
+        assert!(fake
+            .vote(123, "auth-token", Some(VoteDirection::Up))
+            .is_ok());
         fake.fail_vote();
         assert!(fake.vote(123, "auth-token", None).is_err());
 
@@ -426,7 +429,10 @@ mod tests {
         fake.set_session_cookie(Some("user=alice&...".into()));
 
         let api: &dyn HnApi = &fake;
-        assert_eq!(api.current_session_cookie().as_deref(), Some("user=alice&..."));
+        assert_eq!(
+            api.current_session_cookie().as_deref(),
+            Some("user=alice&...")
+        );
         assert!(matches!(fake.calls()[0], FakeCall::CurrentSessionCookie));
     }
 }

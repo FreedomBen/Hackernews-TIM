@@ -18,7 +18,8 @@ CROSS_TARGET ?= x86_64-unknown-linux-gnu
 .DEFAULT_GOAL := help
 
 .PHONY: help all build debug release run test check fmt fmt-check clippy lint \
-        clean install uninstall docker-build docker-run cross-build doc
+        clean install uninstall docker-build docker-run cross-build doc \
+        insta-review insta-accept
 
 help: ## Show this help
 	@echo "hackernews_tim — Makefile targets"
@@ -51,11 +52,11 @@ ${RELEASE_BIN}:
 run: ## Run the app (debug build)
 	${CARGO} run -p hackernews_tim --
 
-test: ## Run workspace tests
-	${CARGO} test --workspace
+test: ## Run workspace tests (enables test-support for integration tests)
+	${CARGO} test --workspace --all-features
 
 check: ## Type-check without producing binaries
-	${CARGO} check --workspace --all-targets
+	${CARGO} check --workspace --all-targets --all-features
 
 fmt: ## Format sources with rustfmt
 	${CARGO} fmt --all
@@ -64,7 +65,7 @@ fmt-check: ## Verify formatting (CI-friendly)
 	${CARGO} fmt --all -- --check
 
 clippy: ## Run clippy lints (warnings as errors)
-	${CARGO} clippy --workspace --all-targets -- -D warnings
+	${CARGO} clippy --workspace --all-targets --all-features -- -D warnings
 
 lint: fmt-check clippy ## Run fmt-check and clippy
 
@@ -94,3 +95,9 @@ docker-run: ## Run Docker image interactively
 
 cross-build: ## Cross-compile release binary for CROSS_TARGET (uses Cross.toml)
 	cross build --release --target ${CROSS_TARGET}
+
+insta-review: ## Review pending insta snapshot diffs (requires cargo-insta)
+	${CARGO} insta review
+
+insta-accept: ## Accept all pending insta snapshots without review
+	${CARGO} insta accept

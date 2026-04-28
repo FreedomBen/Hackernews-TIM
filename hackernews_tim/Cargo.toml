@@ -61,3 +61,11 @@ comfy-table = "7.1.1"
 html-escape = "0.2.13"
 rpassword = "7.3"
 keyring = "3"
+
+[dev-dependencies]
+
+# Snapshot testing for view-level rendering. Snapshot files live next
+# to integration tests under `hackernews_tim/tests/snapshots/`. Update
+# them via `cargo insta review` (preferred) or `INSTA_UPDATE=always`
+# during `cargo test`.
+insta = "1"

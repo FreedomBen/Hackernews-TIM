@@ -44,6 +44,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --workspace --all-features
       - name: Cargo format
         uses: actions-rs/cargo@v1
         with:
@@ -54,4 +55,4 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D warnings
+          args: --workspace --all-targets --all-features -- -D warnings

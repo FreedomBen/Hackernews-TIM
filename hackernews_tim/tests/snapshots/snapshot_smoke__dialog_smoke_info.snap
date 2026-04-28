@@ -1,0 +1,10 @@
+---
+source: hackernews_tim/tests/snapshot_smoke.rs
+expression: harness.screen_text()
+---
+
+            ┌──┤ Smoke ├──┐
+            │ snapshot me │
+            │             │
+            │        <Ok> │
+            └─────────────┘

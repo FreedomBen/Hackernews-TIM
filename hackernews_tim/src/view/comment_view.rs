@@ -535,7 +535,6 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
     let find_state_for_ptl = find_state.clone();
     let find_state_for_sib_back = find_state.clone();
     let find_next_for_ntl = comment_view_keymap.find_next_match.clone();
-    let find_prev_for_ptl = comment_view_keymap.find_prev_match.clone();
 
     OnEventView::new(CommentView::new(data, find_state))
         .on_pre_event_inner(EventTrigger::from_fn(|_| true), move |s, e| {
@@ -676,9 +675,16 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
             let next_id = s.find_sibling(id, NavigationDirection::Next);
             s.set_focus_index(next_id)
         })
-        .on_pre_event_inner(comment_view_keymap.prev_top_level_comment, move |s, e| {
-            if find_prev_for_ptl.has_event(e) && !find_state_for_ptl.borrow().match_ids.is_empty() {
-                return None;
+        // When a find session is active, the prev-top-level key (default
+        // `p`) doubles as a prev-match shortcut, mirroring `N`. With no
+        // matches highlighted it falls back to sibling-prev navigation.
+        .on_pre_event_inner(comment_view_keymap.prev_top_level_comment, move |s, _| {
+            {
+                let mut state = find_state_for_ptl.borrow_mut();
+                if !state.match_ids.is_empty() {
+                    state.pending = Some(FindSignal::JumpPrev);
+                    return Some(EventResult::Consumed(None));
+                }
             }
             let id = s.get_focus_index();
             let next_id = s.find_sibling(id, NavigationDirection::Previous);

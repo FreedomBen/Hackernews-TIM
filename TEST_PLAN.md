@@ -63,7 +63,7 @@ authoritative test names.
 - [x] 3.1.1 PTY harness — `portable-pty` + `vt100`, `tests/e2e.rs` entry + `tests/e2e/` helpers
 - [x] 3.1.2 Fixture HN backend — `wiremock`-served Algolia + Firebase responses (with `HNClient` base-URL overrides)
 - [x] 3.1.3 Keyring mock backend wired via `keyring::set_default_credential_builder`
-- [ ] 3.1.4 `make e2e` target, Linux-only `cfg` gate, CI matrix entry
+- [x] 3.1.4 `make e2e` target, Linux-only `cfg` gate, CI matrix entry
 - [ ] 3.2.a First-run flow + front-page render (table 3.2.1)
 - [ ] 3.2.b Comment view drilldown + back navigation (table 3.2.2–3.2.3)
 - [ ] 3.2.c Search view workflow (table 3.2.4)

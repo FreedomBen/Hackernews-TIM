@@ -17,7 +17,7 @@ CROSS_TARGET ?= x86_64-unknown-linux-gnu
 
 .DEFAULT_GOAL := help
 
-.PHONY: help all build debug release run test check fmt fmt-check clippy lint \
+.PHONY: help all build debug release run test e2e check fmt fmt-check clippy lint \
         clean install uninstall docker-build docker-run cross-build doc \
         insta-review insta-accept
 
@@ -26,7 +26,7 @@ help: ## Show this help
 	@echo ""
 	@echo "Usage: make [target] [PREFIX=/usr/local] [DESTDIR=]"
 	@echo ""
-	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ \
+	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z0-9_-]+:.*##/ \
 		{ printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2 }' ${MAKEFILE_LIST}
 	@echo ""
 	@echo "Variables:"
@@ -54,6 +54,13 @@ run: ## Run the app (debug build)
 
 test: ## Run workspace tests (enables test-support for integration tests)
 	${CARGO} test --workspace --all-features
+
+e2e: ## Run end-to-end PTY tests (Linux-only); each tests/e2e_*.rs binary serially
+	@for f in hackernews_tim/tests/e2e_*.rs; do \
+		name=$$(basename $$f .rs); \
+		echo "==> ${CARGO} test -p hackernews_tim --test $$name -- --test-threads=1"; \
+		${CARGO} test -p hackernews_tim --test $$name -- --test-threads=1 || exit 1; \
+	done
 
 check: ## Type-check without producing binaries
 	${CARGO} check --workspace --all-targets --all-features

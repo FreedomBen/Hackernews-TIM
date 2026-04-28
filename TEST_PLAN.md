@@ -383,14 +383,21 @@ with `#[cfg(target_os = "linux")]`, and CI runs `make e2e` only on the
 - Add `portable-pty` and `vt100` as
   `[target.'cfg(target_os = "linux")'.dev-dependencies]` of the
   `hackernews_tim` crate.
-- Layout: `hackernews_tim/tests/e2e.rs` is the integration test crate
-  entry point (Cargo runs it via `--test e2e`); shared helpers live in
-  `hackernews_tim/tests/e2e/helpers.rs` (or split into multiple files
-  under `tests/e2e/`) and are pulled into the entry file with
-  `#[path = "e2e/helpers.rs"] mod helpers;` so Cargo doesn't try to
-  compile them as a second test binary. Every scenario lives as a
-  `#[test]` function in `tests/e2e.rs` (or a `mod` it imports), all
-  guarded by `#[cfg(target_os = "linux")]`.
+- Layout: each scenario group is its own integration test binary at
+  `hackernews_tim/tests/e2e_<group>.rs` (e.g. `e2e_first_run.rs`,
+  `e2e_navigation.rs`, `e2e_search.rs`, `e2e_article.rs`,
+  `e2e_login.rs`, `e2e_vote_reply.rs`, `e2e_custom_keymap.rs`,
+  `e2e_cli_flags.rs`, `e2e_quit_errors.rs`). Splitting into separate
+  binaries keeps single-scenario iteration fast (`cargo test --test
+  e2e_login`) at the cost of more compile artifacts. Every file is
+  guarded by a top-level `#![cfg(target_os = "linux")]` so it compiles
+  to an empty binary on macOS / Windows.
+- Shared helpers live in `hackernews_tim/tests/e2e/mod.rs` (and
+  optionally sibling files like `tests/e2e/fakehn.rs`,
+  `tests/e2e/keyring.rs`); each test binary pulls them in with
+  `#[path = "e2e/mod.rs"] mod helpers;`. The `tests/e2e/` subdirectory
+  is not at the top of `tests/`, so Cargo will not treat it as a
+  separate test crate.
 - Helpers:
   - `spawn_app(args, env, cwd) -> AppHandle` — spawns the debug binary in
     a PTY sized to a known dimension (e.g. 120×40), wires its master end
@@ -414,6 +421,11 @@ with `#[cfg(target_os = "linux")]`, and CI runs `make e2e` only on the
   module owns a small `tokio` runtime (or uses `#[tokio::test]` /
   `Runtime::block_on`) to start the server and capture recorded requests
   from sync test bodies.
+- Phase 3 deliberately exercises the real `HNClient` against the fake
+  HTTP server rather than the `HnApi` / `FakeHnApi` trait double from
+  Phase 2. The point is to catch regressions in the HTTP layer, header
+  parsing, cookie handling, and error mapping that a trait-level fake
+  cannot reach. Do not refactor Phase 3 to use `FakeHnApi`.
 - Build a `FakeHnServer` that mounts canned responses for the Algolia
   (`/api/v1/...`) and HN-official (`/v0/...`, the Firebase host) paths
   used by `HNClient`. The constants in `client/mod.rs` are
@@ -444,10 +456,18 @@ with `#[cfg(target_os = "linux")]`, and CI runs `make e2e` only on the
 - Keep the e2e module behind `#[cfg(target_os = "linux")]` so `cargo
   test` on macOS / Windows skips it cleanly with no compile-time
   dependency on `portable-pty` / `vt100` / `wiremock`.
-- Add a `make e2e` target wrapping
-  `cargo test -p hackernews_tim --test e2e -- --test-threads=1` (PTY
-  tests are not safe to parallelize across the same temp `HOME`, and
-  the keyring mock backend is process-global). Update `make help`.
+- Add a `make e2e` target that iterates over every `tests/e2e_*.rs`
+  binary and runs each with `--test-threads=1` (PTY tests are not safe
+  to parallelize across the same temp `HOME`, and the keyring mock
+  backend is process-global). Sketch:
+  ```make
+  e2e: ## Run end-to-end PTY tests (Linux-only)
+  	@for f in hackernews_tim/tests/e2e_*.rs; do \
+  		name=$$(basename $$f .rs); \
+  		cargo test -p hackernews_tim --test $$name -- --test-threads=1 || exit 1; \
+  	done
+  ```
+  Update `make help` so the new target is listed.
 - In `.github/workflows/ci.yml`, run `make e2e` only on the
   `ubuntu-latest` matrix entry. Other OSes continue to run the existing
   `make test` only.
@@ -538,3 +558,4 @@ with `#[cfg(target_os = "linux")]`, and CI runs `make e2e` only on the
 | Update snapshots (Phase 2)    | `cargo insta review`                             |
 | Doctests                      | `cargo test --doc -p hackernews_tim`             |
 | End-to-end (Phase 3, Linux)   | `make e2e`                                       |
+| Single e2e binary             | `cargo test -p hackernews_tim --test e2e_login`  |

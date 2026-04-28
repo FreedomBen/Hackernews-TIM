@@ -1,11 +1,11 @@
 mod async_view;
-mod find_bar;
+pub mod find_bar;
 mod fn_view_wrapper;
 mod link_dialog;
 mod login_dialog;
 mod result_view;
 mod text_view;
-mod traits;
+pub mod traits;
 mod utils;
 
 pub mod article_view;

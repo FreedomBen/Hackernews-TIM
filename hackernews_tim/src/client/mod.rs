@@ -1886,6 +1886,17 @@ pub fn get_user_info() -> Option<&'static UserInfo> {
     USER_INFO.get().and_then(|opt| opt.as_ref())
 }
 
+/// Idempotent variant of [`init_user_info`] for tests. Multiple callers
+/// can invoke it; the first wins and subsequent calls are silent no-ops,
+/// which keeps integration tests that share the global state from
+/// panicking on `OnceCell::set` collisions.
+///
+/// Available to integration tests via the `test-support` feature.
+#[cfg(any(test, feature = "test-support"))]
+pub fn init_test_user_info(info: Option<UserInfo>) {
+    let _ = USER_INFO.set(info);
+}
+
 pub fn init_client() -> &'static HNClient {
     let client = HNClient::new().unwrap();
     install_client(client)

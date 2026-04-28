@@ -13,6 +13,10 @@ pub trait ListViewContainer {
         self.get_inner_list().len()
     }
 
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     fn get_focus_index(&self) -> usize {
         self.get_inner_list().get_focus_index()
     }

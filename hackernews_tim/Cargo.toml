@@ -68,4 +68,4 @@ keyring = "3"
 # to integration tests under `hackernews_tim/tests/snapshots/`. Update
 # them via `cargo insta review` (preferred) or `INSTA_UPDATE=always`
 # during `cargo test`.
-insta = "1"
+insta = { version = "1", features = ["filters"] }

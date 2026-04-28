@@ -496,8 +496,10 @@ pub fn get_config() -> &'static Config {
 /// call into code paths reading `get_config_theme()` etc. don't panic. Safe
 /// to call from many test modules; the first caller wins and the rest are
 /// no-ops because all tests share the same default config snapshot.
-#[cfg(test)]
-pub(crate) fn init_test_config() {
+///
+/// Available to integration tests via the `test-support` feature.
+#[cfg(any(test, feature = "test-support"))]
+pub fn init_test_config() {
     let _ = CONFIG.set(Config::default());
 }
 

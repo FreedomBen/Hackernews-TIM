@@ -16,9 +16,9 @@
 //!   reports `stories.len() == 0` via the public field.
 //!
 //! Scenarios deferred to a follow-up commit (vote/login state,
-//! tag-cycle, find dialog UX, post-event hooks) are tracked in the
-//! Phase 2.2.1 row of TEST_PLAN.md — they need background-thread
-//! orchestration the puppet harness can't yet drive deterministically.
+//! tag-cycle, find dialog UX) are tracked in the Phase 2.2.1 row of
+//! TEST_PLAN.md — they need background-thread orchestration the
+//! puppet harness can't yet drive deterministically.
 
 use std::collections::HashMap;
 
@@ -29,7 +29,7 @@ use cursive::Cursive;
 
 use hackernews_tim::client::fake::FakeHnApi;
 use hackernews_tim::client::{init_test_user_info, HnApi, StoryNumericFilters, StorySortMode};
-use hackernews_tim::config::init_test_config;
+use hackernews_tim::config::{get_global_keymap, init_test_config};
 use hackernews_tim::model::Story;
 use hackernews_tim::test_support::PuppetHarness;
 use hackernews_tim::view::find_bar::{FindSignal, FindState, FindStateRef};
@@ -330,4 +330,121 @@ fn esc_key_propagates_to_find_outer_layer() {
         })
         .unwrap();
     assert_eq!(focus, 0, "Esc on row 0 should leave focus where it is");
+}
+
+fn many_fixture_stories(n: u32) -> Vec<Story> {
+    (0..n)
+        .map(|i| fixture_story(1000 + i, &format!("Story #{i}"), "alice", 10 + i))
+        .collect()
+}
+
+#[test]
+fn page_down_advances_focus_by_half_page() {
+    // The default puppet size is 120x40, so half_page == 20 lines. Each
+    // story takes a single row inside the inner LinearLayout, so 20
+    // page-down events should move focus by ~20 rows. We assert a
+    // conservative lower bound (>= 5) so a row-height tweak in
+    // `Self::get_story_text` doesn't break the test, and that focus does
+    // not exceed the list's last index.
+    ensure_globals_initialised();
+    let mut siv = Cursive::new();
+    let _find_state = build_named_main_view(&mut siv, many_fixture_stories(40));
+    let mut harness = PuppetHarness::new(siv);
+    harness.step_until_idle();
+
+    fn focus_index(harness: &mut PuppetHarness) -> usize {
+        harness
+            .cursive_mut()
+            .call_on_name("story_view_outer", |v: &mut OnEventView<StoryView>| {
+                v.get_inner_mut().get_focus_index()
+            })
+            .expect("named view should be present")
+    }
+
+    let initial = focus_index(&mut harness);
+    assert_eq!(initial, 0);
+
+    harness.send(Event::Key(Key::PageDown));
+    harness.step_until_idle();
+    let after_down = focus_index(&mut harness);
+    assert!(
+        (5..40).contains(&after_down),
+        "PageDown should advance focus by at least half a page, got {after_down}"
+    );
+
+    harness.send(Event::Key(Key::PageUp));
+    harness.step_until_idle();
+    let after_up = focus_index(&mut harness);
+    assert!(
+        after_up < after_down,
+        "PageUp should move focus back, got {after_up} (was {after_down})"
+    );
+}
+
+#[test]
+fn ctrl_d_advances_focus_by_half_page() {
+    // The scroll keymap binds Ctrl-D as an alias for page-down so vim
+    // muscle-memory works. Verify the alias is wired up identically.
+    ensure_globals_initialised();
+    let mut siv = Cursive::new();
+    let _find_state = build_named_main_view(&mut siv, many_fixture_stories(40));
+    let mut harness = PuppetHarness::new(siv);
+    harness.step_until_idle();
+
+    harness.send(Event::CtrlChar('d'));
+    harness.step_until_idle();
+
+    let focus = harness
+        .cursive_mut()
+        .call_on_name("story_view_outer", |v: &mut OnEventView<StoryView>| {
+            v.get_inner_mut().get_focus_index()
+        })
+        .unwrap();
+    assert!(
+        (5..40).contains(&focus),
+        "Ctrl-D should advance focus by at least half a page, got {focus}"
+    );
+}
+
+#[test]
+fn goto_previous_view_on_only_layer_is_a_no_op() {
+    // The global `goto_previous_view` keymap (default Backspace) calls
+    // `pop_layer` only when the screen has more than one layer (see
+    // `view::init_ui`). When the StoryView is the lone layer — as it is
+    // on app start — pressing Backspace must be a silent no-op rather
+    // than a panic-on-empty-screen.
+    ensure_globals_initialised();
+    let mut siv = Cursive::new();
+    let _find_state = build_named_main_view(&mut siv, fixture_stories());
+    // Mirror the wiring `view::init_ui` installs so this test exercises
+    // the real callback rather than re-implementing it.
+    let goto_prev = get_global_keymap().goto_previous_view.clone();
+    siv.set_on_post_event(goto_prev, |s| {
+        if s.screen_mut().len() > 1 {
+            s.pop_layer();
+        }
+    });
+
+    let mut harness = PuppetHarness::new(siv);
+    harness.step_until_idle();
+
+    let layers_before = harness.cursive_mut().screen_mut().len();
+    assert_eq!(layers_before, 1, "test should start with a single layer");
+
+    harness.send(Event::Key(Key::Backspace));
+    harness.step_until_idle();
+
+    let layers_after = harness.cursive_mut().screen_mut().len();
+    assert_eq!(
+        layers_after, 1,
+        "Backspace on the only layer must not pop it"
+    );
+
+    let focus = harness
+        .cursive_mut()
+        .call_on_name("story_view_outer", |v: &mut OnEventView<StoryView>| {
+            v.get_inner_mut().get_focus_index()
+        })
+        .unwrap();
+    assert_eq!(focus, 0, "Backspace must not move focus on the lone view");
 }

@@ -513,6 +513,19 @@ impl ScrollViewContainer for CommentView {
     }
 }
 
+/// Resolve the link-open numeric prefix typed by the user. Empty input
+/// (a bare `o`/`O`) defaults to link 1 so the threads view's "re: parent
+/// thread" header opens with a single keystroke. A non-empty buffer
+/// containing junk returns `None`, leaving the event for downstream
+/// handlers.
+fn parse_link_index(raw_command: &str) -> Option<usize> {
+    if raw_command.is_empty() {
+        Some(1)
+    } else {
+        raw_command.parse::<usize>().ok()
+    }
+}
+
 fn construct_comment_main_view(client: &'static client::HNClient, data: PageData) -> impl View {
     let is_suffix_key = |c: &Event| -> bool {
         let comment_view_keymap = config::get_comment_view_keymap();
@@ -716,28 +729,25 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
                 Some(EventResult::Consumed(None))
             }
         })
-        // open external link shortcuts
+        // open external link shortcuts. Bare `o`/`O` (no numeric prefix)
+        // opens link 1, so pressing `o` on a focused comment opens its
+        // first link — that's how the threads view's `re: parent thread`
+        // header is documented to work.
         .on_pre_event_inner(comment_view_keymap.open_link_in_browser, |s, _| {
-            match s.raw_command.parse::<usize>() {
-                Ok(num) => {
-                    s.raw_command.clear();
-                    utils::open_ith_link_in_browser(&s.items[s.get_focus_index()].links, num)
-                }
-                Err(_) => None,
-            }
+            let num = parse_link_index(&s.raw_command)?;
+            s.raw_command.clear();
+            utils::open_ith_link_in_browser(&s.items[s.get_focus_index()].links, num)
         })
         .on_pre_event_inner(
             comment_view_keymap.open_link_in_article_view,
-            move |s, _| match s.raw_command.parse::<usize>() {
-                Ok(num) => {
-                    s.raw_command.clear();
-                    utils::open_ith_link_in_article_view(
-                        client,
-                        &s.items[s.get_focus_index()].links,
-                        num,
-                    )
-                }
-                Err(_) => None,
+            move |s, _| {
+                let num = parse_link_index(&s.raw_command)?;
+                s.raw_command.clear();
+                utils::open_ith_link_in_article_view(
+                    client,
+                    &s.items[s.get_focus_index()].links,
+                    num,
+                )
             },
         )
         .on_pre_event_inner(comment_view_keymap.open_comment_in_browser, move |s, _| {
@@ -835,4 +845,26 @@ pub fn construct_and_add_new_threads_view(
 ) {
     let async_view = async_view::construct_threads_view_async(s, client, username, page);
     s.screen_mut().add_transparent_layer(Layer::new(async_view));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_link_index_defaults_to_one_when_empty() {
+        assert_eq!(parse_link_index(""), Some(1));
+    }
+
+    #[test]
+    fn parse_link_index_uses_typed_prefix() {
+        assert_eq!(parse_link_index("3"), Some(3));
+        assert_eq!(parse_link_index("12"), Some(12));
+    }
+
+    #[test]
+    fn parse_link_index_returns_none_for_garbage() {
+        assert_eq!(parse_link_index("x"), None);
+        assert_eq!(parse_link_index("1a"), None);
+    }
 }

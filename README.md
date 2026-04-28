@@ -281,9 +281,9 @@ For more information about configuring the application's key mappings or definin
 | `open_article_in_browser`      | Open in browser the discussed article                                           | `a`              |
 | `open_article_in_article_view` | Open in article view the discussed article                                      | `A`              |
 | `open_story_in_browser`        | Open in browser the discussed story                                             | `s`              |
-| `open_comment_in_browser`      | Open in browser the focused comment                                             | `c`              |
-| `open_link_in_browser`         | Open in browser the {link_id}-th link in the focused comment                    | `{link_id} o`    |
-| `open_link_in_article_view`    | Open in article view the {link_id}-th link in the focused comment               | `{link_id} O`    |
+| `open_comment_in_browser`      | Open in browser the focused comment                                                  | `c`              |
+| `open_link_in_browser`         | Open in browser the {link_id}-th link in the focused comment (defaults to 1)         | `[{link_id}] o`  |
+| `open_link_in_article_view`    | Open in article view the {link_id}-th link in the focused comment (defaults to 1)    | `[{link_id}] O`  |
 
 #### Search View shortcuts
 

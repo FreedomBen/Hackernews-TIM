@@ -503,6 +503,16 @@ pub fn init_test_config() {
     let _ = CONFIG.set(Config::default());
 }
 
+/// Idempotent variant of [`init_test_config`] that lets the caller install
+/// a non-default `Config` — e.g. one with extra `custom_keymaps` entries
+/// for testing global-navigation shortcuts. Subsequent calls (including
+/// from [`init_test_config`]) are silent no-ops, so the *first* test in
+/// the binary to call this wins.
+#[cfg(any(test, feature = "test-support"))]
+pub fn init_test_config_with(config: Config) {
+    let _ = CONFIG.set(config);
+}
+
 /// The story-listing page size, clamped to
 /// [`MIN_PAGE_SIZE`]..=[`MAX_PAGE_SIZE`]. Read lazily so a user-facing
 /// value out of range silently gets pulled into a working range rather

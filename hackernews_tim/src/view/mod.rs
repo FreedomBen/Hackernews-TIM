@@ -42,7 +42,16 @@ fn set_up_switch_story_view_shortcut(
     });
 }
 
-fn set_up_global_callbacks(
+/// Install all of the application's global event-loop callbacks
+/// (`F1`–`F6` story-tag navigation, custom keymaps from
+/// `[[keymap.custom_keymaps]]`, `goto_previous_view`, `goto_search_view`,
+/// `open_help_dialog`, `open_login_dialog`, `open_my_threads_in_browser`,
+/// `goto_my_threads_view`, and `quit`) on the given Cursive instance.
+///
+/// Public so integration tests under `tests/` can wire callbacks onto a
+/// freshly-constructed `Cursive` without going through [`init_ui`] (which
+/// also performs theme setup and adds an initial async story view).
+pub fn set_up_global_callbacks(
     s: &mut Cursive,
     client: &'static dyn client::HnApi,
     auth_file: std::path::PathBuf,

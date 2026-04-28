@@ -482,9 +482,7 @@ fn main() {
                         }
                         Ok(Some(_)) => {
                             info!("edit of comment {comment_id} aborted: unchanged");
-                            eprintln!(
-                                "✗ Comment {comment_id} not edited: the body was unchanged."
-                            );
+                            eprintln!("✗ Comment {comment_id} not edited: the body was unchanged.");
                             reply_editor::wait_for_enter();
                         }
                         Ok(None) => {

@@ -7,8 +7,7 @@ use super::{
 };
 use crate::client::StoryNumericFilters;
 use crate::prelude::*;
-
-static STORY_TAGS: [&str; 5] = ["front_page", "story", "ask_hn", "show_hn", "job"];
+use crate::view::utils::STORY_TAGS;
 
 type VoteUpdate = (u32, VoteData);
 type VouchUpdate = (u32, VouchData);
@@ -663,49 +662,7 @@ pub fn construct_story_main_view(
 }
 
 fn get_story_view_title_bar(tag: &'static str, sort_mode: client::StorySortMode) -> impl View {
-    let style = config::get_config_theme().component_style.title_bar;
-    let mut title = StyledString::styled(
-        "[Y]",
-        Style::from(style).combine(ColorStyle::front(
-            config::get_config_theme().palette.light_white,
-        )),
-    );
-    title.append_styled(" Hacker News", style);
-
-    for (i, item) in STORY_TAGS.iter().enumerate() {
-        title.append_styled(" | ", style);
-        if *item == tag {
-            let sort_mode_desc = match sort_mode {
-                client::StorySortMode::None => "",
-                client::StorySortMode::Date => " (by_date)",
-                client::StorySortMode::Points => " (by_point)",
-            };
-            title.append_styled(
-                format!("{}.{}{}", i + 1, item, sort_mode_desc),
-                Style::from(style)
-                    .combine(config::get_config_theme().component_style.current_story_tag),
-            );
-        } else {
-            title.append_styled(format!("{}.{}", i + 1, item), style);
-        }
-    }
-    title.append_styled(" | ", style);
-
-    let user_info = utils::build_user_info_text(style.into());
-
-    PaddedView::lrtb(
-        0,
-        0,
-        0,
-        1,
-        Layer::with_color(
-            LinearLayout::horizontal()
-                .child(TextView::new(title))
-                .child(TextView::new(StyledString::new()).full_width())
-                .child(TextView::new(user_info)),
-            style.into(),
-        ),
-    )
+    utils::construct_story_view_top_bar(tag, sort_mode)
 }
 
 /// Construct a story view given a list of stories.

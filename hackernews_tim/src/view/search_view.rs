@@ -378,7 +378,10 @@ fn construct_search_view(client: &'static client::HNClient, cb_sink: CbSink) -> 
     let main_view = construct_search_main_view(client, cb_sink);
 
     let mut view = LinearLayout::vertical()
-        .child(utils::construct_view_title_bar("Search View"))
+        .child(utils::construct_view_title_bar_with_nav(
+            "Search View",
+            utils::NavTarget::Search,
+        ))
         .child(main_view)
         .child(utils::construct_footer_view::<SearchView>());
 

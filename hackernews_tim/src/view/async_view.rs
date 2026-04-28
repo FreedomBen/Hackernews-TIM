@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{article_view, comment_view, result_view::ResultView, story_view};
+use super::{article_view, comment_view, result_view::ResultView, story_view, utils};
 use crate::client;
 use crate::prelude::*;
 use anyhow::Context;
@@ -16,7 +16,7 @@ pub fn construct_comment_view_async(
         move |result: Result<_>| {
             ResultView::new(
                 result.with_context(|| format!("failed to load comments from item (id={item_id})")),
-                |data| comment_view::construct_comment_view(client, data),
+                |data| comment_view::construct_comment_view(client, data, utils::NavTarget::None),
             )
         }
     })
@@ -43,7 +43,9 @@ pub fn construct_threads_view_async(
                 result.with_context(move || {
                     format!("failed to load threads for user {username} (page {page})")
                 }),
-                |data| comment_view::construct_comment_view(client, data),
+                |data| {
+                    comment_view::construct_comment_view(client, data, utils::NavTarget::MyThreads)
+                },
             )
         },
     )

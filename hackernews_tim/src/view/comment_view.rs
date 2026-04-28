@@ -792,12 +792,16 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
         .full_height()
 }
 
-pub fn construct_comment_view(client: &'static client::HNClient, data: PageData) -> impl View {
+pub fn construct_comment_view(
+    client: &'static client::HNClient,
+    data: PageData,
+    nav: utils::NavTarget,
+) -> impl View {
     let title = format!("Comment View - {}", data.title,);
     let main_view = construct_comment_main_view(client, data);
 
     let mut view = LinearLayout::vertical()
-        .child(utils::construct_view_title_bar(&title))
+        .child(utils::construct_view_title_bar_with_nav(&title, nav))
         .child(main_view)
         .child(utils::construct_footer_view::<CommentView>());
     view.set_focus_index(1)

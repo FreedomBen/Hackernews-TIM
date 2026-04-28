@@ -1,6 +1,8 @@
 use std::io::{self, IsTerminal, Write};
 use std::path::Path;
 
+use super::AuthStorage;
+
 const LIGHT_CONFIG: &str = include_str!("../../../examples/config.toml");
 const DARK_CONFIG: &str = include_str!("../../../examples/config-dark.toml");
 
@@ -130,11 +132,16 @@ pub enum AuthPromptResult {
     /// The user declined to log in. No file should be written.
     Skip,
     /// The user entered credentials — still need to verify + write.
-    Credentials { username: String, password: String },
+    Credentials {
+        username: String,
+        password: String,
+        storage: AuthStorage,
+    },
 }
 
 /// Interactively ask the user whether to log in to Hacker News, and if so
-/// collect a username + password (password input is masked).
+/// collect a credential-storage choice plus username + password (password
+/// input is masked).
 ///
 /// Returns `None` when stdin/stdout is not a TTY or the interaction fails,
 /// so the caller can silently fall back to "no auth".
@@ -161,6 +168,8 @@ pub fn prompt_for_auth() -> Option<AuthPromptResult> {
         }
     }
 
+    let storage = prompt_for_auth_storage()?;
+
     print!("Username: ");
     io::stdout().flush().ok()?;
     let mut username = String::new();
@@ -183,7 +192,65 @@ pub fn prompt_for_auth() -> Option<AuthPromptResult> {
         return Some(AuthPromptResult::Skip);
     }
 
-    Some(AuthPromptResult::Credentials { username, password })
+    Some(AuthPromptResult::Credentials {
+        username,
+        password,
+        storage,
+    })
+}
+
+/// Ask where to store the upcoming credentials. Defaults to file storage
+/// (capital `F` in the prompt) so users who want the legacy plaintext
+/// behavior can just hit enter. When the user picks `keyring`, the OS
+/// credential manager is probed up front; on failure the user is offered
+/// a one-shot fall back to file storage rather than committing to a
+/// backend that won't work.
+fn prompt_for_auth_storage() -> Option<AuthStorage> {
+    println!("Where should credentials be stored?");
+    println!("  [F]ile    plaintext TOML on disk (mode 0600 on Unix)");
+    println!("  [k]eyring OS credential manager (Keychain / Credential Manager / Secret Service)");
+
+    let storage = loop {
+        print!("Storage [F/k]: ");
+        if io::stdout().flush().is_err() {
+            return None;
+        }
+
+        let mut buf = String::new();
+        if io::stdin().read_line(&mut buf).is_err() {
+            return None;
+        }
+
+        match buf.trim().to_ascii_lowercase().as_str() {
+            "f" | "file" | "" => break AuthStorage::File,
+            "k" | "keyring" => break AuthStorage::Keyring,
+            _ => eprintln!("Please enter 'f' or 'k'."),
+        }
+    };
+
+    if storage == AuthStorage::Keyring && !super::keyring_available() {
+        eprintln!(
+            "OS keyring isn't usable on this system (probe failed — likely no Secret \
+             Service available, or Keychain access denied)."
+        );
+        loop {
+            print!("Fall back to file storage? [Y/n]: ");
+            if io::stdout().flush().is_err() {
+                return None;
+            }
+            let mut buf = String::new();
+            if io::stdin().read_line(&mut buf).is_err() {
+                return None;
+            }
+            match buf.trim().to_ascii_lowercase().as_str() {
+                "y" | "yes" | "" => return Some(AuthStorage::File),
+                "n" | "no" => return None,
+                _ => eprintln!("Please enter 'y' or 'n'."),
+            }
+        }
+    }
+
+    Some(storage)
 }
 
 /// Interactively ask the user which default config flavor to write.

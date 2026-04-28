@@ -21,10 +21,11 @@ fn run(
     client: &'static client::HNClient,
     start_id: Option<u32>,
     auth_file: std::path::PathBuf,
+    auth_storage: config::AuthStorage,
     login_status: client::StartupLoginStatus,
 ) -> Option<reply_editor::PendingAction> {
     // setup the application's UI
-    let s = view::init_ui(client, start_id, auth_file, login_status);
+    let s = view::init_ui(client, start_id, auth_file, auth_storage, login_status);
 
     // use `cursive_buffered_backend` crate to fix the flickering issue
     // when using `cursive` with `crossterm_backend` (See https://github.com/gyscos/Cursive/issues/142)
@@ -125,6 +126,19 @@ fn parse_args(config_dir: std::path::PathBuf, cache_dir: std::path::PathBuf) -> 
                 )
                 .next_line_help(true),
         )
+        .arg(
+            Arg::new("migrate_auth")
+                .long("migrate-auth")
+                .value_name("STORAGE")
+                .value_parser(["file", "keyring"])
+                .conflicts_with_all(["init_config", "update_theme"])
+                .help(
+                    "Move credentials at the --auth path between storage backends and exit. \
+                     `file` writes plaintext TOML; `keyring` stores the password (and cached \
+                     session cookie) in the OS credential manager.",
+                )
+                .next_line_help(true),
+        )
         .get_matches()
 }
 
@@ -158,7 +172,11 @@ fn init_auth(auth_path: &std::path::Path) -> Option<config::Auth> {
     if !auth_path.exists() {
         match config::prompt_for_auth() {
             None | Some(config::AuthPromptResult::Skip) => return None,
-            Some(config::AuthPromptResult::Credentials { username, password }) => {
+            Some(config::AuthPromptResult::Credentials {
+                username,
+                password,
+                storage,
+            }) => {
                 let session = match client::verify_credentials(&username, &password) {
                     Ok(session) => session,
                     Err(err) => {
@@ -170,12 +188,22 @@ fn init_auth(auth_path: &std::path::Path) -> Option<config::Auth> {
                     username,
                     password,
                     session,
+                    storage,
                 };
                 if let Err(err) = auth.write_to_file(auth_path) {
                     eprintln!("Failed to write auth to {}: {err:#}", auth_path.display());
                     return None;
                 }
-                println!("Wrote auth to {}", auth_path.display());
+                match storage {
+                    config::AuthStorage::File => {
+                        println!("Wrote auth to {}", auth_path.display())
+                    }
+                    config::AuthStorage::Keyring => println!(
+                        "Stored credentials in OS keyring (service \"{}\"); pointer file at {}",
+                        config::KEYRING_SERVICE,
+                        auth_path.display()
+                    ),
+                }
                 return Some(auth);
             }
         }
@@ -370,6 +398,35 @@ fn main() {
         }
     }
 
+    if let Some(target) = args.get_one::<String>("migrate_auth") {
+        let target: config::AuthStorage = target
+            .parse()
+            .expect("clap value_parser restricts this to 'file' or 'keyring'");
+        match config::migrate_auth(&auth_path, target) {
+            Ok(config::MigrationOutcome::NoOp { storage }) => {
+                println!(
+                    "Auth at {} is already using {storage} storage; nothing to migrate.",
+                    auth_path.display()
+                );
+                std::process::exit(0);
+            }
+            Ok(config::MigrationOutcome::Migrated { from, to }) => {
+                println!(
+                    "Migrated credentials at {} from {from} to {to}.",
+                    auth_path.display()
+                );
+                std::process::exit(0);
+            }
+            Err(err) => {
+                eprintln!(
+                    "Failed to migrate auth at {} to {target}: {err:#}",
+                    auth_path.display()
+                );
+                std::process::exit(1);
+            }
+        }
+    }
+
     if !config_path.exists() {
         if let Some(flavor) = config::prompt_for_flavor() {
             match config::write_default_config(config_path, flavor) {
@@ -423,8 +480,21 @@ fn main() {
 
     let mut start_id = args.get_one::<u32>("start_id").cloned();
     let mut login_status = login_status;
+    // The in-app login dialog (`L`) writes back to whichever backend the
+    // user already chose; if there's no auth loaded yet it defaults to
+    // file storage, matching the behavior before keyring support.
+    let auth_storage = auth
+        .as_ref()
+        .map(|a| a.storage)
+        .unwrap_or(config::AuthStorage::File);
     loop {
-        match run(client, start_id, auth_path.clone(), login_status) {
+        match run(
+            client,
+            start_id,
+            auth_path.clone(),
+            auth_storage,
+            login_status,
+        ) {
             None => break,
             Some(reply_editor::PendingAction::ReplyTo {
                 parent_id,

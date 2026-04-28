@@ -1,5 +1,5 @@
 .\" Manpage for hackernews_tim.
-.TH HACKERNEWS_TIM 1 "2026-04-23" "hackernews_tim 0.13.5" "User Commands"
+.TH HACKERNEWS_TIM 1 "2026-04-28" "hackernews_tim 0.13.5" "User Commands"
 .SH NAME
 hackernews_tim \- terminal user interface for browsing Hacker News
 .SH SYNOPSIS
@@ -74,7 +74,23 @@ file with the latest default for
 .RB ( light\  or\  dark )
 and exit. Other sections and surrounding comments are preserved.
 Errors if the config file does not exist. Mutually exclusive with
-.BR \-\-init\-config .
+.BR \-\-init\-config\  and\  \-\-migrate\-auth .
+.TP
+.BI \-\-migrate\-auth\ STORAGE
+Move the credentials at the
+.B \-\-auth
+path between storage backends and exit.
+.I STORAGE
+is
+.B file
+(plaintext TOML on disk) or
+.B keyring
+(OS credential manager: macOS Keychain, Windows Credential Manager,
+or Linux Secret Service). When migrating away from the keyring the
+orphaned keyring entries are deleted. A no-op when the auth file is
+already using the requested backend. Errors if the auth file does
+not exist. Mutually exclusive with
+.BR \-\-init\-config\  and\  \-\-update\-theme .
 .TP
 .B \-h ,\ \-\-help
 Print a short help message and exit.
@@ -153,12 +169,42 @@ in the comment view) and the
 theme override. Login failures are logged as warnings and the
 application continues unauthenticated.
 .PP
+Two credential-storage backends are supported, selected by the
+first-run prompt or by
+.BR \-\-migrate\-auth :
+.TP
+.B file
+The default. Username, password, and the cached session cookie live
+in plaintext TOML at the
+.B \-\-auth
+path; on Unix the file is
+.IR chmod\  0600 .
+.TP
+.B keyring
+Password and session cookie are stored in the OS credential manager
+under service name
+.B hackernews-tim
+(account
+.I <username>
+for the password,
+.I <username>:session
+for the cookie). The file at the
+.B \-\-auth
+path becomes a small pointer carrying just
+.B storage = "keyring"
+and
+.BR username .
+Probed up front during the first-run prompt so misconfigured systems
+fall back to file storage.
+.PP
 On each successful login the app captures HN's
 .B user=
-session cookie and writes it back to the auth file as a
+session cookie and writes it back to the active backend (a
 .B session
-field. Subsequent runs reuse that cookie to restore the session
-without re-POSTing to
+field in the file, or the
+.I <username>:session
+keyring entry). Subsequent runs reuse that cookie to restore the
+session without re-POSTing to
 .BR /login ,
 which Hacker News throttles with a CAPTCHA after repeated attempts.
 When the cached session expires the app falls back to the stored
@@ -169,10 +215,21 @@ password and refreshes the cookie.
 Default configuration file path.
 .TP
 .I $XDG_CONFIG_HOME/hackernews-tim/hn-auth.toml
-Default authentication file path. Stores the Hacker News username,
-password, and (after a successful login) a cached
+Default authentication file path. With the
+.B file
+storage backend (default), holds the Hacker News username,
+password, and a cached
 .B session
 cookie value in plain text; protect its permissions accordingly.
+With the
+.B keyring
+backend, holds only
+.B storage = "keyring"
+and
+.B username
+\(em the password and session cookie live in the OS credential
+manager under service name
+.BR hackernews-tim .
 .TP
 .I $XDG_CONFIG_HOME/hn-tui.toml ",\ " $HOME/.config/hn-tui.toml
 Legacy configuration paths from before the app moved its files into
@@ -213,15 +270,18 @@ paths.
 .TP
 .B 0
 Normal exit, including after
-.B \-\-init\-config
+.BR \-\-init\-config ,
+.BR \-\-update\-theme ,
 or
-.BR \-\-update\-theme .
+.BR \-\-migrate\-auth .
 .TP
 .B 1
 Failed to write or update the configuration file when
 .B \-\-init\-config
 or
 .B \-\-update\-theme
+was requested, or failed to migrate the auth file when
+.B \-\-migrate\-auth
 was requested.
 .SH EXAMPLES
 Run with the default configuration:
@@ -263,6 +323,14 @@ table in an existing config with the latest light defaults:
 .RS 4
 .nf
 hackernews_tim --update-theme light
+.fi
+.RE
+.PP
+Move existing credentials from a plaintext file into the OS keyring:
+.PP
+.RS 4
+.nf
+hackernews_tim --migrate-auth keyring
 .fi
 .RE
 .SH SEE ALSO

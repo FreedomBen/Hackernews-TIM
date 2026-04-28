@@ -8,8 +8,13 @@ const STATUS_ID: &str = "login_dialog_status";
 
 /// Build a login dialog that collects a username/password, verifies them
 /// against Hacker News by reusing the live [`HNClient`], and on success
-/// writes the credentials to `auth_file`.
-pub fn get_login_dialog(client: &'static client::HNClient, auth_file: PathBuf) -> impl View {
+/// persists the credentials using `storage` (and updates `auth_file` —
+/// either as full credentials or as a keyring pointer file).
+pub fn get_login_dialog(
+    client: &'static client::HNClient,
+    auth_file: PathBuf,
+    storage: config::AuthStorage,
+) -> impl View {
     let layout = LinearLayout::vertical()
         .child(TextView::new("Username:"))
         .child(EditView::new().with_name(USERNAME_ID).fixed_width(32))
@@ -52,17 +57,24 @@ pub fn get_login_dialog(client: &'static client::HNClient, auth_file: PathBuf) -
                         username,
                         password,
                         session: client.current_session_cookie(),
+                        storage,
                     };
                     match auth.write_to_file(&auth_file) {
                         Ok(()) => {
                             s.pop_layer();
-                            s.add_layer(
-                                Dialog::info(format!(
-                                    "Logged in as {}. Credentials saved to {}.",
-                                    auth.username,
+                            let saved_to = match storage {
+                                config::AuthStorage::File => {
+                                    format!("Credentials saved to {}.", auth_file.display())
+                                }
+                                config::AuthStorage::Keyring => format!(
+                                    "Credentials stored in OS keyring (service \"{}\"); pointer file at {}.",
+                                    config::KEYRING_SERVICE,
                                     auth_file.display()
-                                ))
-                                .title("Login successful"),
+                                ),
+                            };
+                            s.add_layer(
+                                Dialog::info(format!("Logged in as {}. {saved_to}", auth.username))
+                                    .title("Login successful"),
                             );
                         }
                         Err(err) => {

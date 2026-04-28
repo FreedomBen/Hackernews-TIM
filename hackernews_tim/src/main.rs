@@ -446,7 +446,11 @@ fn main() {
                         reply_editor::wait_for_enter();
                     }
                     Ok(None) => {
-                        // Empty body → user aborted; re-enter the TUI silently.
+                        info!("reply to item {parent_id} aborted: empty body");
+                        eprintln!(
+                            "✗ Reply to item {parent_id} not posted: the editor exited with an empty reply."
+                        );
+                        reply_editor::wait_for_enter();
                     }
                     Err(err) => {
                         warn!("editor handoff for reply (id={parent_id}) failed: {err:#}");

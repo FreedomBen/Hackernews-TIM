@@ -1,0 +1,33 @@
+---
+source: hackernews_tim/tests/comment_view.rs
+assertion_line: 151
+expression: harness.screen_text()
+---
+
+
+
+
+
+
+
+
+
+
+
+  An interesting post
+  42 points | by alice | [time ago] | 4 comments
+
+
+  ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+  bob [time ago]
+  First top-level comment
+
+    ▎carol [time ago]
+    ▎Reply to bob
+
+    ▎dan [time ago]
+    ▎Another reply to bob
+
+  ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+  erin [time ago]
+  Second top-level comment

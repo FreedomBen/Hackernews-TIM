@@ -526,7 +526,10 @@ fn parse_link_index(raw_command: &str) -> Option<usize> {
     }
 }
 
-fn construct_comment_main_view(client: &'static dyn client::HnApi, data: PageData) -> impl View {
+pub fn construct_comment_main_view(
+    client: &'static dyn client::HnApi,
+    data: PageData,
+) -> OnEventView<CommentView> {
     let is_suffix_key = |c: &Event| -> bool {
         let comment_view_keymap = config::get_comment_view_keymap();
         comment_view_keymap.open_link_in_browser.has_event(c)
@@ -832,7 +835,6 @@ fn construct_comment_main_view(client: &'static dyn client::HnApi, data: PageDat
         .on_pre_event_inner(scroll_keymap.page_down, |s, _| s.move_focus_half_page(true))
         .on_pre_event_inner(scroll_keymap.page_up, |s, _| s.move_focus_half_page(false))
         .on_scroll_events()
-        .full_height()
 }
 
 pub fn construct_comment_view(
@@ -841,7 +843,7 @@ pub fn construct_comment_view(
     nav: utils::NavTarget,
 ) -> impl View {
     let title = format!("Comment View - {}", data.title,);
-    let main_view = construct_comment_main_view(client, data);
+    let main_view = construct_comment_main_view(client, data).full_height();
 
     let mut view = LinearLayout::vertical()
         .child(utils::construct_view_title_bar_with_nav(

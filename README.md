@@ -11,7 +11,7 @@ Hackernews-TIM is a fork of [`hackernews-TUI`](https://github.com/aome510/hacker
 - **Interactive HN login** with a first-run prompt, cached session cookie, and in-app login dialog. Logged-in username, karma, and profile topcolor appear in title bars; your own stories and comments are marked with an orange `*`, and your own comments also show their point count on the byline.
 - **Full voting support**: upvote/downvote stories from the story list, downvote comments, and vouch dead/flagged items. Vote state is pre-fetched so arrows render on every page.
 - **Reply and edit flows**: reply to stories and comments via your `$EDITOR`; edit your own comments in place. Aborted replies and edits report an explicit message instead of silently dropping.
-- **In-TUI threads view** (`F6`): browse your own HN comments inside the app, with replies expanded under each one. Each entry is prefixed with a `re: <story title>` link so a bare `o` / `O` jumps you back to the parent thread.
+- **In-TUI threads view** (`F6`): browse your own HN comments inside the app, with replies expanded under each one. Each entry is prefixed with a `re: <story title>` link, and a bare `o` / `O` from any focused item — the user's own comment or any reply underneath it — jumps you back to the parent thread.
 - **Global nav strip** on every top-level view: a focusable `[Y] Hacker News | 1.front_page | … | search (^S) | 6.threads` row in the title bar, with the active view highlighted. `Enter` on a button switches views; `j` / `k` and arrow keys move focus across the title bar / main view / footer.
 - **Dead and flagged content is visible** when authenticated, badged with `[dead]` / `[flagged]`, and rendered faded. Honors your HN `showdead` profile setting.
 - **Find-on-page** (`/`, `n`, `N`) across comment, story, article, and search views. In the comment view, `n` / `N` (and `p`) double as sibling-prev/next navigation when no find session is active.
@@ -284,8 +284,8 @@ For more information about configuring the application's key mappings or definin
 | `open_article_in_article_view` | Open in article view the discussed article                                      | `A`              |
 | `open_story_in_browser`        | Open in browser the discussed story                                             | `s`              |
 | `open_comment_in_browser`      | Open in browser the focused comment                                                  | `c`              |
-| `open_link_in_browser`         | Open in browser the {link_id}-th link in the focused comment (defaults to 1)         | `[{link_id}] o`  |
-| `open_link_in_article_view`    | Open in article view the {link_id}-th link in the focused comment (defaults to 1)    | `[{link_id}] O`  |
+| `open_link_in_browser`         | Open in browser the {link_id}-th link in the focused comment (bare `o` defaults to link 1, or to the parent thread in the threads view) | `[{link_id}] o`  |
+| `open_link_in_article_view`    | Open in article view the {link_id}-th link in the focused comment (bare `O` defaults to link 1, or to the parent thread in the threads view) | `[{link_id}] O`  |
 
 #### Search View shortcuts
 

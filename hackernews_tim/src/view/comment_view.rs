@@ -744,22 +744,38 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
         // open external link shortcuts. Bare `o`/`O` (no numeric prefix)
         // opens link 1, so pressing `o` on a focused comment opens its
         // first link — that's how the threads view's `re: parent thread`
-        // header is documented to work.
+        // header is documented to work. In the threads view, every item
+        // (root comment and replies) carries `parent_story_url`; when the
+        // buffer is empty we open that directly so a bare `o`/`O` jumps
+        // back to the parent thread regardless of which item is focused
+        // and regardless of whether the focused item has any links of
+        // its own.
         .on_pre_event_inner(comment_view_keymap.open_link_in_browser, |s, _| {
+            let id = s.get_focus_index();
+            if s.raw_command.is_empty() {
+                if let Some(url) = s.items[id].parent_story_url.clone() {
+                    utils::open_url_in_browser(&url);
+                    return Some(EventResult::Consumed(None));
+                }
+            }
             let num = parse_link_index(&s.raw_command)?;
             s.raw_command.clear();
-            utils::open_ith_link_in_browser(&s.items[s.get_focus_index()].links, num)
+            utils::open_ith_link_in_browser(&s.items[id].links, num)
         })
         .on_pre_event_inner(
             comment_view_keymap.open_link_in_article_view,
             move |s, _| {
+                let id = s.get_focus_index();
+                if s.raw_command.is_empty() {
+                    if let Some(url) = s.items[id].parent_story_url.clone() {
+                        return Some(EventResult::with_cb(move |siv| {
+                            article_view::construct_and_add_new_article_view(client, siv, &url)
+                        }));
+                    }
+                }
                 let num = parse_link_index(&s.raw_command)?;
                 s.raw_command.clear();
-                utils::open_ith_link_in_article_view(
-                    client,
-                    &s.items[s.get_focus_index()].links,
-                    num,
-                )
+                utils::open_ith_link_in_article_view(client, &s.items[id].links, num)
             },
         )
         .on_pre_event_inner(comment_view_keymap.open_comment_in_browser, move |s, _| {

@@ -256,6 +256,7 @@ impl HNClient {
                 // score; that field is HTML-only. The HTML path overrides
                 // this for the viewer's own root-level comment.
                 points: None,
+                parent_story_url: None,
             }
             .into(),
             typ => {
@@ -442,18 +443,27 @@ impl HNClient {
         // [hit_0_root, hit_0_replies…, hit_1_root, hit_1_replies…, …].
         // On per-subtree fetch failure we fall back to the flat hit so
         // the user still sees their comment without its reply tree.
+        //
+        // Stamp the parent thread URL onto every comment in the subtree
+        // (root + replies) so a bare `o`/`O` from any focused item — not
+        // just the level-0 user comment with the visible `re:` header —
+        // jumps back to the parent thread.
         let comments: Vec<Comment> = log!(
             response
                 .hits
                 .into_par_iter()
                 .flat_map(|hit| {
                     let id = hit.id();
+                    let parent_story_url = hit.story_url();
                     let header = hit.story_header_html();
                     match self.get_item_from_id::<CommentResponse>(id) {
                         Ok(subtree) => {
                             let mut comments: Vec<Comment> = subtree.into();
                             if let Some(root) = comments.first_mut() {
                                 root.content = format!("{header}{}", root.content);
+                            }
+                            for c in &mut comments {
+                                c.parent_story_url = parent_story_url.clone();
                             }
                             comments
                         }
@@ -1388,6 +1398,7 @@ fn parse_comments_from_content(page_content: &str) -> Vec<Comment> {
             dead,
             flagged,
             points,
+            parent_story_url: None,
         });
     }
 

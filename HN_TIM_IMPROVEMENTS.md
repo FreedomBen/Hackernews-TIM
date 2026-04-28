@@ -46,7 +46,7 @@ Please review these before merging upstream. Most ship with automatic migration,
 - **F6 / `goto_my_threads_view`**: in-TUI version of HN's `/threads?id=<u>` page, rendered through the existing `CommentView`. Requires authentication; falls back to the same "Log in first" dialog as the existing browser shortcut.
 - Replies under each user comment are expanded by fetching the full subtree from the Firebase `/items/{id}` endpoint. Subtrees fan out in parallel via rayon while preserving listing order, so each user comment shows at level 0 with its descendants below. On per-subtree fetch failure the bare comment is still shown.
 - Each entry is prefixed with a `re: <story title>` link header so you can jump to the parent thread via the link dialog.
-- A bare `o` / `O` in the comment view (no numeric prefix) now defaults to opening link 1, which lands on the `re:` header in this view.
+- A bare `o` / `O` in the comment view (no numeric prefix) now defaults to opening link 1. In the threads view, every item in each user-comment subtree (the user's level-0 comment plus all replies) carries a `parent_story_url`, so a bare `o` / `O` from any focused item in the subtree opens the parent thread — replies don't need a visible `re:` header to inherit the same shortcut.
 
 ### Global navigation strip
 - All top-level views (story, comment, article, search, threads) now render a `[Y] Hacker News | 1.front_page | … | search (^S) | 6.threads` strip in the title bar, mirrored from the F1–F6 / Ctrl-S keybindings. Previously this strip only appeared on the story view.

@@ -184,6 +184,7 @@ impl From<CommentResponse> for Vec<Comment> {
                 dead: c.dead,
                 flagged: c.flagged,
                 points: None,
+                parent_story_url: None,
             }
         };
 
@@ -229,6 +230,15 @@ impl UserCommentResponse {
         self.id
     }
 
+    /// Parent thread URL on news.ycombinator.com, propagated to every
+    /// comment in the threads-view subtree (root + replies) so a bare
+    /// `o`/`O` from any focused item jumps back to the parent thread.
+    /// Returns `None` when the parent story id isn't known.
+    pub fn story_url(&self) -> Option<String> {
+        self.story_id
+            .map(|sid| format!("{}/item?id={sid}", super::HN_HOST_URL))
+    }
+
     /// HTML snippet linking back to the parent thread, used as a header
     /// prefix on the user's own comment in the threads view. The link is
     /// plain HTML so it flows through `parse_hn_html_text` and ends up
@@ -255,6 +265,7 @@ impl UserCommentResponse {
     /// fails — we still want the user to see their own comment, just
     /// without the reply tree.
     pub fn into_root_comment(self) -> Option<Comment> {
+        let parent_story_url = self.story_url();
         let header = self.story_header_html();
         let author = self.author?;
         let text = self.comment_text?;
@@ -269,6 +280,7 @@ impl UserCommentResponse {
             dead: self.dead,
             flagged: self.flagged,
             points: None,
+            parent_story_url,
         })
     }
 }
@@ -323,5 +335,65 @@ mod tests {
         let parsed: UserCommentsResponse = serde_json::from_str(json).unwrap();
         let comments: Vec<Comment> = parsed.into();
         assert!(comments.is_empty());
+    }
+
+    #[test]
+    fn user_comment_response_story_url_uses_story_id() {
+        let json = r#"{
+            "hits": [
+                {
+                    "objectID": "1",
+                    "author": "alice",
+                    "comment_text": "x",
+                    "created_at_i": 1,
+                    "story_id": 4242,
+                    "story_title": "t"
+                }
+            ]
+        }"#;
+        let parsed: UserCommentsResponse = serde_json::from_str(json).unwrap();
+        let hit = &parsed.hits[0];
+        assert_eq!(
+            hit.story_url(),
+            Some(format!("{}/item?id=4242", super::HN_HOST_URL))
+        );
+    }
+
+    #[test]
+    fn user_comment_response_story_url_none_when_story_id_missing() {
+        let json = r#"{
+            "hits": [
+                {
+                    "objectID": "1",
+                    "author": "alice",
+                    "comment_text": "x",
+                    "created_at_i": 1
+                }
+            ]
+        }"#;
+        let parsed: UserCommentsResponse = serde_json::from_str(json).unwrap();
+        let hit = &parsed.hits[0];
+        assert!(hit.story_url().is_none());
+    }
+
+    #[test]
+    fn into_root_comment_populates_parent_story_url() {
+        let json = r#"{
+            "hits": [
+                {
+                    "objectID": "7",
+                    "author": "alice",
+                    "comment_text": "x",
+                    "created_at_i": 1,
+                    "story_id": 4242,
+                    "story_title": "t"
+                }
+            ]
+        }"#;
+        let mut parsed: UserCommentsResponse = serde_json::from_str(json).unwrap();
+        let hit = parsed.hits.remove(0);
+        let expected = hit.story_url();
+        let comment = hit.into_root_comment().unwrap();
+        assert_eq!(comment.parent_story_url, expected);
     }
 }

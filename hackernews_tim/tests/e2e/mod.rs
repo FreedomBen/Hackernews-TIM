@@ -17,6 +17,7 @@
 #![allow(dead_code)] // Helpers are shared across many e2e binaries; not all are used by every one.
 
 pub mod fakehn;
+pub mod keyring;
 
 use std::collections::HashMap;
 use std::ffi::OsString;

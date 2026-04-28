@@ -69,3 +69,14 @@ keyring = "3"
 # them via `cargo insta review` (preferred) or `INSTA_UPDATE=always`
 # during `cargo test`.
 insta = { version = "1", features = ["filters"] }
+
+# Phase 3 PTY end-to-end tests (TEST_PLAN.md §3). Linux-only — Windows
+# PTY behavior and macOS keyring quirks add flakiness we don't need to
+# solve at this tier. Each `tests/e2e_*.rs` binary is gated by a
+# top-level `#![cfg(target_os = "linux")]`, so on macOS / Windows the
+# binaries compile to empty stubs and these dependencies are not pulled
+# in.
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+portable-pty = "0.8"
+vt100 = "0.15"
+tempfile = "3"

@@ -111,8 +111,10 @@ impl CommentView {
         }
     }
 
-    /// Move focus to the next matched item at or after the current focus.
-    /// Wraps to the first match when none follow the current focus.
+    /// Move focus to the next matched item strictly after the current
+    /// focus. Wraps to the first match when none follow — including the
+    /// case where the current focus is itself the last match, so
+    /// pressing `n` on the final hit cycles back to the first.
     fn jump_to_next_match(&mut self) {
         let current = self.get_focus_index();
         let target = {
@@ -123,7 +125,7 @@ impl CommentView {
             state
                 .match_ids
                 .iter()
-                .find(|&&i| i >= current)
+                .find(|&&i| i > current)
                 .copied()
                 .or_else(|| state.match_ids.first().copied())
         };
@@ -531,6 +533,7 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
     let find_state_for_esc = find_state.clone();
     let find_state_for_ntl = find_state.clone();
     let find_state_for_ptl = find_state.clone();
+    let find_state_for_sib_back = find_state.clone();
     let find_next_for_ntl = comment_view_keymap.find_next_match.clone();
     let find_prev_for_ptl = comment_view_keymap.find_prev_match.clone();
 
@@ -675,6 +678,19 @@ fn construct_comment_main_view(client: &'static client::HNClient, data: PageData
         })
         .on_pre_event_inner(comment_view_keymap.prev_top_level_comment, move |s, e| {
             if find_prev_for_ptl.has_event(e) && !find_state_for_ptl.borrow().match_ids.is_empty() {
+                return None;
+            }
+            let id = s.get_focus_index();
+            let next_id = s.find_sibling(id, NavigationDirection::Previous);
+            s.set_focus_index(next_id)
+        })
+        // Mirror the vim `n`/`N` pairing for sibling cycling: the
+        // `find_prev_match` key (default `N`) doubles as a sibling-prev
+        // shortcut whenever no find session is active. The earlier
+        // `find_prev_match` handler already consumes the event when
+        // matches exist, so this runs only in the no-match case.
+        .on_pre_event_inner(comment_view_keymap.find_prev_match.clone(), move |s, _| {
+            if !find_state_for_sib_back.borrow().match_ids.is_empty() {
                 return None;
             }
             let id = s.get_focus_index();

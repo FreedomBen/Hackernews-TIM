@@ -43,7 +43,7 @@ truth for individual cases.
 ### Phase 2 (view-level tests)
 
 - [x] 2.1.1 Introduce `HnApi` trait + `FakeHnApi` test double
-- [ ] 2.1.2 Wire up the Cursive puppet backend + `tests/support` helpers
+- [x] 2.1.2 Wire up the Cursive puppet backend + `tests/support` helpers
 - [ ] 2.1.3 Add `insta` snapshot library
 - [ ] 2.2.1 StoryView tests
 - [ ] 2.2.2 CommentView tests

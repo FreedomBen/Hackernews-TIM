@@ -13,3 +13,6 @@ pub mod prelude;
 pub mod reply_editor;
 pub mod utils;
 pub mod view;
+
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_support;

@@ -54,6 +54,23 @@ truth for individual cases.
 - [x] 2.3 Fixture discipline (`tests/fixtures/`, `FakeHnApi` per-test config)
 - [x] Phase 2 acceptance — view tests run with no network; `HnApi` is the only data dependency in `view/*`
 
+### Phase 3 (PTY end-to-end tests, Linux-only)
+
+- [ ] 3.1.1 PTY harness — `portable-pty` + `vt100`
+- [ ] 3.1.2 Fixture HN backend — `wiremock`-served Algolia + Firebase responses (with `HNClient` base-URL overrides)
+- [ ] 3.1.3 `tests/e2e/` helpers, `make e2e` target, Linux-only `cfg` gate
+- [ ] 3.2.1 First-run flow + front-page render
+- [ ] 3.2.2 Comment view drilldown + back navigation
+- [ ] 3.2.3 Search view workflow
+- [ ] 3.2.4 Article view + reader mode
+- [ ] 3.2.5 Login flow against fake backend
+- [ ] 3.2.6 Vote / reply happy paths
+- [ ] 3.2.7 Custom keymap from TOML
+- [ ] 3.2.8 CLI flags (`-i`, `--init-config`, `--update-theme`, `--migrate-auth`)
+- [ ] 3.2.9 Error / network-failure paths
+- [ ] 3.3 Fixture and harness discipline (per-test temp HOME, env-var backend, snapshot review)
+- [ ] Phase 3 acceptance — `make e2e` green on Linux CI; real binary exercised with mocked HN backends; macOS/Windows skip cleanly
+
 ---
 
 ## Phase 1 — Pure-logic tests (no new infrastructure)
@@ -340,13 +357,125 @@ Each item below is one or more integration tests under `hackernews_tim/tests/`.
 
 ---
 
+## Phase 3 — PTY end-to-end tests (Linux-only)
+
+Goal: drive the real `hackernews_tim` binary in a pseudo-terminal,
+simulating keystrokes and asserting on rendered terminal output. Catches
+regressions in keymap wiring, `cursive_buffered_backend` interactions, the
+full `init_ui` graph, and the CLI surface (`-c`, `-a`, `-i`,
+`--init-config`, `--update-theme`, `--migrate-auth`) that Phases 1 and 2
+do not exercise.
+
+Linux-only by design — Windows PTY behavior and macOS keyring quirks add
+flakiness that is not worth solving at this tier. The e2e module is gated
+with `#[cfg(target_os = "linux")]`, and CI runs `make e2e` only on the
+`ubuntu-latest` job.
+
+### 3.1 Infrastructure (do this first, in this order)
+
+#### 3.1.1 PTY harness
+
+- Add `portable-pty` and `vt100` as
+  `[target.'cfg(target_os = "linux")'.dev-dependencies]` of the
+  `hackernews_tim` crate.
+- Create `hackernews_tim/tests/e2e/mod.rs` with helpers:
+  - `spawn_app(args, env, cwd) -> AppHandle` — spawns the debug binary in
+    a PTY sized to a known dimension (e.g. 120×40), wires its master end
+    to a `vt100::Parser`, and returns a handle.
+  - `AppHandle::send_keys(&str)` — writes UTF-8 / control sequences to
+    the PTY.
+  - `AppHandle::wait_for_text(needle, timeout)` — polls the parser's
+    visible screen until `needle` appears or the timeout fires; on
+    timeout, dumps the screen for diagnosis.
+  - `AppHandle::screen() -> String` — flattened visible text for `insta`
+    snapshot comparison.
+  - `AppHandle::shutdown()` — sends quit, waits for exit, asserts the
+    return code.
+- Each test creates its own `tempfile::TempDir` for `HOME`,
+  `XDG_CONFIG_HOME`, and `XDG_DATA_HOME` so the developer's real config
+  cannot be read or written.
+
+#### 3.1.2 Fixture HN backend
+
+- Add `wiremock` as a dev-dependency.
+- Build a `FakeHnServer` that mounts canned responses for the Algolia
+  (`/api/v1/...`) and Firebase (`/v0/...`) paths used by `HNClient`.
+- Add base-URL overrides to `HNClient` so tests can point it at the fake
+  server. Preferred shape: read `HN_ALGOLIA_BASE` and `HN_FIREBASE_BASE`
+  environment variables on construction, falling back to the production
+  URLs. Document the env vars in `docs/config.md`.
+- Reuse the HTML / JSON fixtures already collected for Phases 1 and 2
+  where possible — duplicate only what's needed for end-to-end paths.
+- For login / vote / reply tests, the fake server records request bodies
+  so assertions can verify the binary sent the expected payload.
+- Auth keyring tests use `keyring`'s mock backend (or a memory credential
+  builder via `keyring::set_default_credential_builder`) so they don't
+  depend on a real OS keychain or D-Bus session.
+
+#### 3.1.3 Test gating
+
+- Keep the e2e module behind `#[cfg(target_os = "linux")]` so `cargo
+  test` on macOS / Windows skips it cleanly with no compile-time
+  dependency on `portable-pty` / `vt100`.
+- Add a `make e2e` target wrapping
+  `cargo test -p hackernews_tim --test e2e -- --test-threads=1` (PTY
+  tests are not safe to parallelize across the same temp `HOME`). Update
+  `make help`.
+- In `.github/workflows/ci.yml`, run `make e2e` only on the
+  `ubuntu-latest` matrix entry. Other OSes continue to run the existing
+  `make test` only.
+
+### 3.2 Scenarios
+
+| ID     | Scenario                                                  | Assertion                                                                                                        |
+| ------ | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 3.2.1  | First run with no config, TTY                             | `prompt_for_flavor` answers `light`; default config is written to the temp config dir; front page renders.       |
+| 3.2.2  | Front-page render + `j` / `k` / `Ctrl-D` navigation       | Visible row marker advances; snapshot of header + first three rows matches.                                      |
+| 3.2.3  | Drill into a story's comments and back                    | Comment view header shows the story title; Backspace returns to the front page in the prior scroll position.     |
+| 3.2.4  | Search workflow                                           | Configured search key opens search; typing a query and pressing Enter renders results from the fake backend.     |
+| 3.2.5  | Article view / reader mode                                | Reader mode renders fixture HTML; link-dialog open + numeric pick invokes a stub `BROWSER` script with the right URL. |
+| 3.2.6  | Login flow                                                | Open login dialog, submit credentials; fake backend returns success; status line shows the username.             |
+| 3.2.7  | Vote happy path                                           | While logged in, vote-up key sends the expected POST to the fake backend; row re-renders with the upvote indicator. |
+| 3.2.8  | Reply happy path                                          | Reply key opens the editor (set to a stub script that writes a fixed body); submitted reply sends the expected POST. |
+| 3.2.9  | Custom keymap from TOML                                   | Config defines a `[[keymap.custom_keymaps]]` block bound to `Z`; pressing `Z` opens a story view with the configured tag and sort. |
+| 3.2.10 | `-i <item_id>` direct entry                               | Binary opens directly into the comment view for the fixture item.                                                |
+| 3.2.11 | `--init-config light` / `--init-config dark`              | Each writes the embedded fixture to the resolved path, prints the success message, and exits 0.                  |
+| 3.2.12 | `--update-theme dark`                                     | The `[theme]` table is replaced; all other tables in the file are byte-identical.                                |
+| 3.2.13 | `--migrate-auth file` ↔ `--migrate-auth keyring`          | Round-trips correctly with the keyring mock backend; auth file shape and keyring contents match expectations.    |
+| 3.2.14 | Quit (`q`)                                                | Process exits 0 within the `shutdown` timeout.                                                                   |
+| 3.2.15 | Network failure                                           | When the fake backend returns 500 for the front page, the UI surfaces an error result view rather than panicking. |
+
+### 3.3 Fixture and harness discipline
+
+- Fixtures live under `hackernews_tim/tests/e2e/fixtures/`; stub editor
+  and browser scripts live under `hackernews_tim/tests/e2e/scripts/`
+  (used via `EDITOR` / `BROWSER` env-var overrides).
+- Each test creates its own `tempfile::TempDir` for `HOME`, config, log,
+  and auth files. Tests must not share state.
+- No real network: every spawn sets `HN_ALGOLIA_BASE` and
+  `HN_FIREBASE_BASE` to the fake backend's URL. A regression test
+  asserts that no request reached the real production hosts during a
+  representative run.
+- Snapshots use `insta`; updates require explicit `cargo insta review`.
+- PTY operations default to a 5 s timeout, configurable per test.
+
+### Phase 3 acceptance
+
+- `make e2e` is green on the Linux CI job.
+- The real `hackernews_tim` binary is exercised end-to-end with no real
+  network access (HN backends mocked via `wiremock`).
+- macOS / Windows CI jobs skip the e2e suite cleanly via
+  `cfg(target_os = "linux")` — `cargo test` continues to pass on those
+  platforms without any new dependencies.
+- Snapshots cover front page, comment view, article view, search view,
+  link dialog, login dialog, and at least one error path.
+- Every CLI flag (`-c`, `-a`, `-l`, `-i`, `--init-config`,
+  `--update-theme`, `--migrate-auth`) is touched by at least one test.
+
+---
+
 ## Out of scope (for now)
 
-- **Tier 3 / PTY end-to-end tests.** Driving the real binary under
-  `portable-pty` + `vt100` would catch keymap wiring, `cursive_buffered_backend`
-  interactions, and the full `init_ui` graph, but the cost (PTY harness,
-  Windows CI flakiness, fixture HN backend) outweighs the benefit until
-  Phase 2 lands.
 - **`config_parser_derive` proc-macro tests.** Currently exercised
   transitively via `config_parser/tests/test.rs`. Adding `trybuild` for
   compile-fail tests is a future improvement, not urgent.
@@ -367,3 +496,4 @@ Each item below is one or more integration tests under `hackernews_tim/tests/`.
 | Single test                   | `cargo test -p hackernews_tim parse_link_index`  |
 | Update snapshots (Phase 2)    | `cargo insta review`                             |
 | Doctests                      | `cargo test --doc -p hackernews_tim`             |
+| End-to-end (Phase 3, Linux)   | `make e2e`                                       |

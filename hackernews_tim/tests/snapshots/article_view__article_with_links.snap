@@ -1,0 +1,28 @@
+---
+source: hackernews_tim/tests/article_view.rs
+assertion_line: 98
+expression: harness.screen_text()
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                    Sample article
+                                        by: alice, date_published: 2024-01-02
+
+  First paragraph with a first link [1].
+
+ Second paragraph mentions two [2].
+
+ Third paragraph references three [3].

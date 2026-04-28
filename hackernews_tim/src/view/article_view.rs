@@ -60,6 +60,11 @@ impl ViewWrapper for ArticleView {
         // which only exists after `TextView::layout` runs.
         self.with_view_mut(|v| v.layout(size));
         self.process_find_signal();
+        // Update/Clear signals replace the inner TextView content;
+        // its cached rows still point into the old bytes. Re-layout so
+        // the next draw indexes the fresh content rather than panicking
+        // off the end of a stale span.
+        self.with_view_mut(|v| v.layout(size));
     }
 
     fn wrap_take_focus(&mut self, _: Direction) -> Result<EventResult, CannotFocus> {
@@ -100,6 +105,22 @@ impl ArticleView {
             match_ranges: Vec::new(),
             current_match: None,
         }
+    }
+
+    /// Snapshot of the link list as collected by the most recent
+    /// parse pass. Test-only accessor — production code reads
+    /// `self.links` directly.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn links_for_test(&self) -> Vec<String> {
+        self.links.clone()
+    }
+
+    /// Number of currently active find matches. Test-only accessor
+    /// — production code reads `self.find_state.match_ids` via the
+    /// shared `FindStateRef`.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn match_ids_len_for_test(&self) -> usize {
+        self.find_state.borrow().match_ids.len()
     }
 
     /// Update the content of the article
@@ -241,7 +262,7 @@ impl ScrollViewContainer for ArticleView {
     }
 }
 
-fn construct_article_main_view(
+pub fn construct_article_main_view(
     client: &'static dyn client::HnApi,
     article: Article,
 ) -> OnEventView<ArticleView> {

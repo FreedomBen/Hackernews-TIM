@@ -362,3 +362,105 @@ impl Article {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::config;
+    use crate::model::Article;
+
+    fn article(content: &str) -> Article {
+        Article {
+            title: "Title".to_string(),
+            url: "https://example.com/post/42".to_string(),
+            content: content.to_string(),
+            author: None,
+            date_published: None,
+        }
+    }
+
+    #[test]
+    fn parse_renders_paragraph_text() {
+        config::init_test_config();
+        let a = article("<html><body><p>hello world</p></body></html>");
+        let result = a.parse(80).expect("article should parse");
+        let src = result.content.source();
+        assert!(src.contains("hello world"), "got {src:?}");
+    }
+
+    #[test]
+    fn parse_extracts_links_in_document_order() {
+        config::init_test_config();
+        let a = article(
+            r#"<html><body>
+                <p>first <a href="https://one.example">one</a>,
+                   second <a href="https://two.example">two</a>,
+                   third <a href="https://three.example">three</a>.</p>
+            </body></html>"#,
+        );
+        let result = a.parse(80).expect("article should parse");
+        // Absolute URLs that already parse cleanly are kept verbatim — the
+        // post-processing only normalises relative paths.
+        assert_eq!(
+            result.links,
+            vec![
+                "https://one.example".to_string(),
+                "https://two.example".to_string(),
+                "https://three.example".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_resolves_relative_urls_against_article_url() {
+        // The post-processing step in Article::parse uses self.url as the
+        // base for relative links. /a/b should become https://example.com/a/b.
+        config::init_test_config();
+        let a = article(r#"<html><body><a href="/a/b">rel</a></body></html>"#);
+        let result = a.parse(80).expect("article should parse");
+        assert_eq!(result.links, vec!["https://example.com/a/b".to_string()]);
+    }
+
+    #[test]
+    fn parse_handles_empty_content() {
+        config::init_test_config();
+        let a = article("");
+        let result = a.parse(80).expect("empty content should not error");
+        assert!(result.links.is_empty());
+    }
+
+    #[test]
+    fn parse_handles_malformed_html_without_panicking() {
+        // html5ever recovers from broken markup; our parser must follow.
+        config::init_test_config();
+        let a = article("<p>unclosed <i>italic <a href='https://x.example'>and link");
+        let result = a.parse(80).expect("malformed html should still parse");
+        // The link should still be picked up.
+        assert_eq!(result.links, vec!["https://x.example".to_string()]);
+    }
+
+    #[test]
+    fn parse_preserves_pre_block_content() {
+        config::init_test_config();
+        let a = article(
+            "<html><body><pre>line one\n    line two\n  line three</pre></body></html>",
+        );
+        let result = a.parse(80).expect("article should parse");
+        let src = result.content.source();
+        // Whitespace inside <pre> is kept (lines are joined with the prefix
+        // string, which is empty at the top level) so each line shows up.
+        assert!(src.contains("line one"), "got {src:?}");
+        assert!(src.contains("line two"), "got {src:?}");
+        assert!(src.contains("line three"), "got {src:?}");
+    }
+
+    #[test]
+    fn article_struct_carries_title_url_metadata() {
+        // The title/url fields are populated by readable-readability when the
+        // client constructs an Article. A locally-built Article preserves
+        // whatever the caller hands in — pin that so a future restructuring
+        // doesn't silently drop fields.
+        let a = article("<p>x</p>");
+        assert_eq!(a.title, "Title");
+        assert_eq!(a.url, "https://example.com/post/42");
+    }
+}

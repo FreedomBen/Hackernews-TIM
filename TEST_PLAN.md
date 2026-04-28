@@ -33,7 +33,7 @@ truth for individual cases.
 - [x] 1.2 `client/mod.rs` — additional private helpers
 - [x] 1.3 `config/keybindings.rs` — typed key parsing
 - [x] 1.4 `parser/html.rs` — HN comment HTML rendering
-- [ ] 1.5 `parser/article.rs` + `parser/rcdom.rs` — reader-mode rendering
+- [x] 1.5 `parser/article.rs` + `parser/rcdom.rs` — reader-mode rendering
 - [ ] 1.6 `utils.rs` — formatting helpers
 - [ ] 1.7 `reply_editor.rs` — scaffold I/O
 - [ ] 1.8 View-module helpers (lift, then test)
@@ -140,6 +140,10 @@ Harder to fixture (depends on `readable-readability`), but doable. Note that
 
 If the readability output is too brittle to snapshot, restrict assertions to
 *invariants* (link count, title presence, no-panic on malformed input).
+
+`parser/rcdom.rs` is a vendored copy of the html5ever sample DOM and is
+exercised transitively by `Article::parse` — it is not directly unit
+tested.
 
 ### 1.6 `utils.rs` — formatting helpers
 

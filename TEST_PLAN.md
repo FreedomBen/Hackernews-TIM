@@ -21,6 +21,41 @@ needs one focused refactor.
 
 ---
 
+## Progress
+
+Tick items as the tests land in `make test`. Sub-section grain is
+deliberately coarse — the tables further down remain the source of
+truth for individual cases.
+
+### Phase 1 (pure-logic tests)
+
+- [ ] 1.1 `client/query.rs` — URL/query construction
+- [ ] 1.2 `client/mod.rs` — additional private helpers
+- [ ] 1.3 `config/keybindings.rs` — typed key parsing
+- [ ] 1.4 `parser/html.rs` — HN comment HTML rendering
+- [ ] 1.5 `parser/article.rs` + `parser/rcdom.rs` — reader-mode rendering
+- [ ] 1.6 `utils.rs` — formatting helpers
+- [ ] 1.7 `reply_editor.rs` — scaffold I/O
+- [ ] 1.8 View-module helpers (lift, then test)
+- [ ] 1.9 Doctests (optional, low priority)
+- [ ] Phase 1 acceptance — `make test` + `cargo clippy -- -D warnings` green; test count roughly doubles
+
+### Phase 2 (view-level tests)
+
+- [ ] 2.1.1 Introduce `HnApi` trait + `FakeHnApi` test double
+- [ ] 2.1.2 Wire up the Cursive puppet backend + `tests/support` helpers
+- [ ] 2.1.3 Add `insta` snapshot library
+- [ ] 2.2.1 StoryView tests
+- [ ] 2.2.2 CommentView tests
+- [ ] 2.2.3 SearchView tests
+- [ ] 2.2.4 ArticleView tests
+- [ ] 2.2.5 LinkDialog / HelpView / LoginDialog / find-bar tests
+- [ ] 2.2.6 Global navigation + post-event hook tests
+- [ ] 2.3 Fixture discipline (`tests/fixtures/`, `FakeHnApi` per-test config)
+- [ ] Phase 2 acceptance — view tests run with no network; `HnApi` is the only data dependency in `view/*`
+
+---
+
 ## Phase 1 — Pure-logic tests (no new infrastructure)
 
 Goal: lift untested pure functions into the existing `#[cfg(test)] mod tests`

@@ -67,7 +67,7 @@ authoritative test names.
 - [x] 3.2.a First-run flow + front-page render (table 3.2.1)
 - [x] 3.2.b Comment view drilldown + back navigation (table 3.2.2–3.2.3)
 - [x] 3.2.c Search view workflow (table 3.2.4)
-- [ ] 3.2.d Article view + reader mode + link dialog (table 3.2.5)
+- [x] 3.2.d Article view + reader mode + link dialog (table 3.2.5)
 - [ ] 3.2.e Login flow against fake backend (table 3.2.6)
 - [ ] 3.2.f Vote / reply happy paths (table 3.2.7–3.2.8)
 - [ ] 3.2.g Custom keymap from TOML (table 3.2.9)

@@ -9,7 +9,24 @@ pub enum StorySortMode {
 }
 
 impl StorySortMode {
-    /// cycle the next story sort mode of a story tag
+    /// Cycle to the next sort mode for the given story tag. The cycle
+    /// depends on the tag:
+    ///
+    /// - `"front_page"` only ever stays at [`StorySortMode::None`].
+    /// - `"story"` and `"job"` cycle `Date → Points → Date` (never `None`).
+    /// - Any other tag (`"ask_hn"`, `"show_hn"`, custom tags) cycles
+    ///   `None → Date → Points → None`.
+    ///
+    /// ```
+    /// use hackernews_tim::client::StorySortMode;
+    /// assert_eq!(StorySortMode::None.next("ask_hn"), StorySortMode::Date);
+    /// assert_eq!(StorySortMode::Date.next("ask_hn"), StorySortMode::Points);
+    /// assert_eq!(StorySortMode::Points.next("ask_hn"), StorySortMode::None);
+    ///
+    /// // story / job cycles between Date and Points only.
+    /// assert_eq!(StorySortMode::Date.next("story"), StorySortMode::Points);
+    /// assert_eq!(StorySortMode::Points.next("story"), StorySortMode::Date);
+    /// ```
     pub fn next(self, tag: &str) -> Self {
         if tag == "front_page" {
             assert!(

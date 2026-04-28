@@ -21,6 +21,14 @@ fn get_time_offset_in_text(offset: u64) -> String {
     }
 }
 
+/// Convert a "days ago" offset into the equivalent number of seconds.
+///
+/// ```
+/// use hackernews_tim::utils::from_day_offset_to_time_offset_in_secs;
+/// assert_eq!(from_day_offset_to_time_offset_in_secs(0), 0);
+/// assert_eq!(from_day_offset_to_time_offset_in_secs(1), 86_400);
+/// assert_eq!(from_day_offset_to_time_offset_in_secs(7), 604_800);
+/// ```
 pub fn from_day_offset_to_time_offset_in_secs(day_offset: u32) -> u64 {
     let day_in_secs: u64 = 24 * 60 * 60;
     day_in_secs * (day_offset as u64)
@@ -37,8 +45,19 @@ pub fn get_elapsed_time_as_text(time: u64) -> String {
     get_time_offset_in_text(offset)
 }
 
-/// A simple URL shortening function that reduces the
-/// URL length if it exceeds a given threshold
+/// A simple URL shortening function that reduces the URL length if it
+/// exceeds a given threshold. URLs of 50 chars or fewer pass through
+/// unchanged; longer ones render as `first40 + "..." + last10`.
+///
+/// ```
+/// use hackernews_tim::utils::shorten_url;
+/// assert_eq!(shorten_url("https://example.com/short"), "https://example.com/short");
+///
+/// let long = "https://example.com/".to_string() + &"a".repeat(60);
+/// let short = shorten_url(&long);
+/// assert!(short.contains("..."));
+/// assert_eq!(short.len(), 53);
+/// ```
 pub fn shorten_url(url: &str) -> String {
     let chars = url.chars().collect::<Vec<_>>();
     let len = chars.len();
@@ -62,7 +81,16 @@ where
         })
 }
 
-/// decode a HTML encoded string
+/// Decode an HTML-encoded string. Handles named entities (`&amp;`,
+/// `&lt;`, `&gt;`) and numeric/hex entities (`&#x27;` etc.). Plain text
+/// passes through unchanged.
+///
+/// ```
+/// use hackernews_tim::utils::decode_html;
+/// assert_eq!(decode_html("&amp;&lt;&gt;"), "&<>");
+/// assert_eq!(decode_html("&#x27;"), "'");
+/// assert_eq!(decode_html("hello world"), "hello world");
+/// ```
 pub fn decode_html(s: &str) -> String {
     html_escape::decode_html_entities(s).into()
 }

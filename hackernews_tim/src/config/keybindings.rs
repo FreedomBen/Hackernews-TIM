@@ -335,6 +335,23 @@ impl From<Keys> for event::EventTrigger {
     }
 }
 
+/// Render a `Keys` value back to its TOML-config-style string form. Single
+/// events render as their own canonical name (`"q"`, `"C-c"`, `"esc"`,
+/// `"f1"`, `"page_up"`); multi-event bindings render as a bracketed
+/// comma-separated list.
+///
+/// ```
+/// use hackernews_tim::config::Keys;
+/// use cursive::event::{Event, Key};
+///
+/// assert_eq!(format!("{}", Keys::new(vec!['q'.into()])), "q");
+/// assert_eq!(format!("{}", Keys::new(vec![Event::CtrlChar('c')])), "C-c");
+/// assert_eq!(format!("{}", Keys::new(vec![Key::Esc.into()])), "esc");
+/// assert_eq!(
+///     format!("{}", Keys::new(vec!['q'.into(), Event::CtrlChar('c')])),
+///     "[q, C-c]"
+/// );
+/// ```
 impl std::fmt::Display for Keys {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fn fmt_event(e: &event::Event, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -399,10 +416,25 @@ impl std::fmt::Display for Keys {
 }
 
 impl Keys {
+    /// Build a `Keys` from a list of events. The list acts as an OR — any
+    /// one of the events triggers the binding.
+    ///
+    /// ```
+    /// use hackernews_tim::config::Keys;
+    /// use cursive::event::{Event, Key};
+    ///
+    /// let quit = Keys::new(vec!['q'.into(), Event::CtrlChar('c')]);
+    /// assert!(quit.has_event(&Event::Char('q')));
+    /// assert!(quit.has_event(&Event::CtrlChar('c')));
+    /// assert!(!quit.has_event(&Event::Key(Key::Esc)));
+    /// ```
     pub fn new(events: Vec<event::Event>) -> Self {
         Keys { events }
     }
 
+    /// True when `e` is one of the events this `Keys` was built from.
+    /// Used as the trigger predicate when converting into a
+    /// [`cursive::event::EventTrigger`].
     pub fn has_event(&self, e: &event::Event) -> bool {
         self.events.contains(e)
     }

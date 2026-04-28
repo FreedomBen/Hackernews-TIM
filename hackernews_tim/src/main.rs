@@ -1,12 +1,6 @@
-// modules
-pub mod client;
-pub mod config;
-pub mod model;
-pub mod parser;
-pub mod prelude;
-pub mod reply_editor;
-pub mod utils;
-pub mod view;
+// Modules live in the library shim (`src/lib.rs`) so doctests can exercise
+// them. The binary uses them via the crate name.
+use hackernews_tim::{client, config, prelude::*, reply_editor, view};
 
 const APP_CONFIG_SUBDIR: &str = "hackernews-tim";
 const DEFAULT_CONFIG_FILE: &str = "config.toml";
@@ -15,7 +9,6 @@ const DEFAULT_AUTH_FILE: &str = "hn-auth.toml";
 const DEFAULT_LOG_FILE: &str = "hn-tui.log";
 
 use clap::*;
-use prelude::*;
 
 fn run(
     client: &'static client::HNClient,

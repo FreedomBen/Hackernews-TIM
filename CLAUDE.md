@@ -33,7 +33,7 @@ Run the app against a custom config or start item:
 
 Three-crate Cargo workspace (`Cargo.toml` at root):
 
-- `hackernews_tim/` — the binary; depends on its sibling crates via path.
+- `hackernews_tim/` — the binary; depends on its sibling crates via path. Also exposes a thin library shim (`src/lib.rs`) that just re-declares `pub mod` for the binary's modules so `cargo test --doc` can exercise documentation examples on the public surface. The binary in `src/main.rs` uses these modules through the library (`use hackernews_tim::{client, config, ...};`), so module source compiles once.
 - `config_parser/` (crate name `config_parser2`) — runtime half of the custom TOML parser. Exposes the `ConfigParse` trait.
 - `config_parser_derive/` — proc-macro crate providing `#[derive(ConfigParse)]`. Pulled in transitively by `config_parser2`.
 

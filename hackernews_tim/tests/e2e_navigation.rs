@@ -121,6 +121,15 @@ fn front_page_navigates_with_j_k_and_ctrl_d() {
         );
     }
 
+    // TEST_PLAN.md §3.2.2 acceptance: PTY-rendered front-page snapshot.
+    // Filter "X units ago" since `created_at_i` is a fixed epoch but the
+    // displayed offset drifts as wall-clock time advances.
+    insta::with_settings!({filters => vec![
+        (r"\d+ \w+ ago", "[time ago]"),
+    ]}, {
+        insta::assert_snapshot!("front_page_three_stories_pty", initial_screen);
+    });
+
     let row_story1 = handle
         .focused_row()
         .expect("front page should have a focused row at startup");

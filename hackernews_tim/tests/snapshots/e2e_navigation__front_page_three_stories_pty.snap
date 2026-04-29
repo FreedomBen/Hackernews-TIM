@@ -1,0 +1,44 @@
+---
+source: hackernews_tim/tests/e2e_navigation.rs
+expression: initial_screen
+---
+[Y] Hacker News | 1.front_page | 2.story | 3.ask_hn | 4.show_hn | 5.job | 6.threads | search (^S) |
+
+1. navigation fixture story one (example.com)
+   250 points | by alice | [time ago] | 12 comments
+2. navigation fixture story two (example.com)
+   150 points | by bob | [time ago] | 7 comments
+3. navigation fixture story three (example.com)
+   90 points | by carol | [time ago] | 3 comments
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                            Hacker News Terminal UI - made by AOME ©                            [?: help] [back] [quit]

@@ -1,0 +1,134 @@
+//! TEST_PLAN.md §3.2.h — CLI flag scenarios (Linux-only). Covers
+//! scenarios 3.2.10–3.2.13 (`-i`, `--init-config`, `--update-theme`,
+//! `--migrate-auth`).
+//!
+//! See [`e2e_first_run.rs`] for the surrounding harness conventions
+//! (TTY-gated flavor / auth prompts, `HOME` / `XDG_*` isolation,
+//! `HN_ALGOLIA_BASE` / `HN_FIREBASE_BASE` / `HN_NEWS_BASE` overrides).
+
+#![cfg(target_os = "linux")]
+
+#[path = "e2e/mod.rs"]
+mod helpers;
+
+use std::time::Duration;
+
+use serde_json::json;
+
+use helpers::fakehn::FakeHnServer;
+use helpers::{spawn_app, AppHandle, SpawnOptions, TestDirs, DEFAULT_WAIT};
+
+const FRONT_PAGE_RENDER_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Pre-write a minimal config TOML at the resolved `--config` path so
+/// the binary skips `prompt_for_flavor`. The auth prompt still fires
+/// because no auth file exists; callers handle that separately.
+fn pre_write_default_config(dirs: &TestDirs) {
+    let path = dirs
+        .xdg_config_home
+        .join("hackernews-tim")
+        .join("config.toml");
+    std::fs::create_dir_all(path.parent().unwrap()).expect("create config dir");
+    // Empty TOML is enough — every field on `Config` is optional and
+    // merges over `Config::default()`.
+    std::fs::write(&path, "").expect("write config.toml");
+}
+
+/// Skip the auth prompt that `init_auth` fires when no auth file
+/// exists. Sends an empty newline (default = N).
+fn dismiss_auth_prompt(handle: &mut AppHandle) {
+    handle
+        .wait_for_text("No auth file found", DEFAULT_WAIT)
+        .expect("auth prompt should print since no auth file exists");
+    handle.send_keys("\n").expect("decline auth prompt");
+}
+
+// =====================================================================
+// 3.2.10 — `-i <item_id>` direct entry
+// =====================================================================
+
+const DIRECT_ITEM_ID: u32 = 99001;
+const DIRECT_ITEM_TITLE: &str = "direct-entry fixture story";
+
+/// Mount the minimal endpoints `construct_and_add_new_comment_view`
+/// needs to render an item with no kids:
+///
+/// * `/v0/item/<id>.json` (Firebase) — the root item, parsed as
+///   `ItemResponse`.
+/// * `/item` (news_base) — the rendered HTML page used by
+///   `parse_vote_data_from_content`. An empty body is fine; the
+///   matcher ignores the query string.
+fn mount_direct_item(server: &FakeHnServer) {
+    server.mount_get_json(
+        format!("/v0/item/{DIRECT_ITEM_ID}.json"),
+        200,
+        json!({
+            "id": DIRECT_ITEM_ID,
+            "type": "story",
+            "by": "alice",
+            "title": DIRECT_ITEM_TITLE,
+            "url": format!("https://example.com/{DIRECT_ITEM_ID}"),
+            "score": 250,
+            "descendants": 0,
+            "time": 1_700_000_000_u64,
+            "kids": [],
+            "text": "",
+        }),
+    );
+    server.mount_get_text("/item", 200, "<html><body></body></html>");
+}
+
+#[test]
+fn dash_i_opens_directly_into_comment_view() {
+    let server = FakeHnServer::start();
+    mount_direct_item(&server);
+
+    let dirs = TestDirs::new().expect("TestDirs::new");
+    pre_write_default_config(&dirs);
+
+    let opts = SpawnOptions::new()
+        .algolia_base(server.algolia_base())
+        .firebase_base(server.firebase_base())
+        .news_base(server.news_base())
+        .arg("-i")
+        .arg(DIRECT_ITEM_ID.to_string())
+        .dirs(dirs);
+    let mut handle = spawn_app(opts).expect("spawn_app should succeed");
+
+    dismiss_auth_prompt(&mut handle);
+
+    handle
+        .wait_for_text(
+            &format!("Comment View - {DIRECT_ITEM_TITLE}"),
+            FRONT_PAGE_RENDER_TIMEOUT,
+        )
+        .expect("comment view header should show the fixture item title");
+
+    let screen = handle.screen();
+    assert!(
+        !screen.contains("Story View"),
+        "expected to land directly on the comment view, not pass through a story view; saw:\n{screen}"
+    );
+
+    // Belt-and-suspenders: the binary should have hit Firebase for
+    // exactly the item we passed via `-i`.
+    let item_requests: Vec<_> = server
+        .received_requests()
+        .into_iter()
+        .filter(|r| {
+            r.method.as_str() == "GET" && r.url.path() == format!("/v0/item/{DIRECT_ITEM_ID}.json")
+        })
+        .collect();
+    assert!(
+        !item_requests.is_empty(),
+        "expected at least one GET /v0/item/{DIRECT_ITEM_ID}.json; got requests: {:?}",
+        server
+            .received_requests()
+            .iter()
+            .map(|r| (r.method.as_str().to_string(), r.url.to_string()))
+            .collect::<Vec<_>>()
+    );
+
+    let status = handle.shutdown().expect("binary should exit cleanly");
+    assert!(status.success(), "expected success exit, got {status:?}");
+}

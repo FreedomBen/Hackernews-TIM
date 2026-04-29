@@ -15,12 +15,14 @@
 //!    + `/search?tags=story,(story_<id>,)`).
 //! 5. We send the default quit key and assert a clean exit.
 //!
-//! Note: the unauthenticated front-page render still calls
-//! `get_listing_vote_state`, which talks directly to
-//! `news.ycombinator.com` (not yet overridable by an env var). That
-//! request returns an empty arrow map either way — fixture story IDs
-//! don't collide with real HN — but a `--no-real-network` enforcement
-//! is deferred to TEST_PLAN.md §3.3 / Phase 3 acceptance.
+//! Note: the unauthenticated front-page render also fires
+//! `get_listing_vote_state` against the news_base `/news` endpoint.
+//! This test deliberately leaves `HN_NEWS_BASE` unset, so the harness
+//! routes that request to the blackhole port (`http://127.0.0.1:1`)
+//! defined in `tests/e2e/mod.rs`; the failure is swallowed by the
+//! client (warn!'d and dropped), so the front page still renders.
+//! The cross-test no-production-host guarantee is asserted by
+//! `tests/e2e_no_real_network.rs` (TEST_PLAN.md §3.3).
 
 #![cfg(target_os = "linux")]
 

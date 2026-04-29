@@ -132,3 +132,74 @@ fn dash_i_opens_directly_into_comment_view() {
     let status = handle.shutdown().expect("binary should exit cleanly");
     assert!(status.success(), "expected success exit, got {status:?}");
 }
+
+// =====================================================================
+// 3.2.11 — `--init-config light` / `--init-config dark`
+// =====================================================================
+
+/// Embedded copies of the default configs the binary writes via
+/// `--init-config`. Asserting byte-for-byte equality catches any
+/// drift between the embedded TOML and the in-tree examples.
+const EMBEDDED_LIGHT_CONFIG: &str = include_str!("../../examples/config.toml");
+const EMBEDDED_DARK_CONFIG: &str = include_str!("../../examples/config-dark.toml");
+
+/// Drive `--init-config <flavor>`: spawn, wait for the success line,
+/// wait for the binary to exit, then return the path the config was
+/// written to plus its on-disk contents.
+fn run_init_config(flavor: &str) -> (std::path::PathBuf, String) {
+    let dirs = TestDirs::new().expect("TestDirs::new");
+    let expected_path = dirs
+        .xdg_config_home
+        .join("hackernews-tim")
+        .join("config.toml");
+    assert!(
+        !expected_path.exists(),
+        "config file should not exist yet at {}",
+        expected_path.display()
+    );
+
+    let opts = SpawnOptions::new()
+        .arg("--init-config")
+        .arg(flavor)
+        .dirs(dirs);
+    let mut handle = spawn_app(opts).expect("spawn_app should succeed");
+
+    let success_marker = format!("Wrote default {flavor} config to");
+    handle
+        .wait_for_text(&success_marker, Duration::from_secs(10))
+        .unwrap_or_else(|e| panic!("expected success line for --init-config {flavor}: {e}"));
+
+    let status = handle
+        .wait_for_exit(Duration::from_secs(5))
+        .expect("binary should exit on its own after writing the config");
+    assert!(
+        status.success(),
+        "--init-config {flavor} should exit 0; got {status:?}"
+    );
+
+    let written =
+        std::fs::read_to_string(&expected_path).expect("written config should be readable");
+    (expected_path, written)
+}
+
+#[test]
+fn init_config_light_writes_embedded_light_default() {
+    let (path, written) = run_init_config("light");
+    assert_eq!(
+        written,
+        EMBEDDED_LIGHT_CONFIG,
+        "config at {} should match the embedded light default byte-for-byte",
+        path.display()
+    );
+}
+
+#[test]
+fn init_config_dark_writes_embedded_dark_default() {
+    let (path, written) = run_init_config("dark");
+    assert_eq!(
+        written,
+        EMBEDDED_DARK_CONFIG,
+        "config at {} should match the embedded dark default byte-for-byte",
+        path.display()
+    );
+}

@@ -4,9 +4,9 @@
 //! `keyring::mock` so `keyring::Entry` round-trips inside the test
 //! process without a real OS credential manager. Real auth-flow
 //! scenarios that exercise the spawned binary live in sibling
-//! `tests/e2e_*.rs` files (TEST_PLAN.md §3.2).
+//! `tests/e2e_*.rs` files (docs/planning/TEST_PLAN.md §3.2).
 //!
-//! See TEST_PLAN.md §3.1.3.
+//! See docs/planning/TEST_PLAN.md §3.1.3.
 //!
 //! On macOS / Windows this file compiles to an empty binary because of
 //! the `#![cfg(target_os = "linux")]` gate.

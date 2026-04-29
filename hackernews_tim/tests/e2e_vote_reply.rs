@@ -1,4 +1,4 @@
-//! TEST_PLAN.md §3.2.7-§3.2.8 — vote / reply happy paths against
+//! docs/planning/TEST_PLAN.md §3.2.7-§3.2.8 — vote / reply happy paths against
 //! a fake HN backend (Linux-only).
 //!
 //! Both scenarios pre-write a config + auth file with a session

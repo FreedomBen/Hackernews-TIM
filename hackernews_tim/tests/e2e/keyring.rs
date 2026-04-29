@@ -6,7 +6,7 @@
 //! in-memory credential builder so `keyring::Entry` operations succeed
 //! without a backing OS keychain.
 //!
-//! See TEST_PLAN.md §3.1.3.
+//! See docs/planning/TEST_PLAN.md §3.1.3.
 //!
 //! ## Why stateful and not `keyring::mock`
 //!
@@ -30,7 +30,7 @@
 //! each binary the harness launches resets the builder back to
 //! `keyring`'s compiled-in default. Scenarios that need to observe
 //! keyring writes performed by the spawned binary (e.g.
-//! `--migrate-auth`, TEST_PLAN.md §3.2.13) must drive the relevant
+//! `--migrate-auth`, docs/planning/TEST_PLAN.md §3.2.13) must drive the relevant
 //! code paths from the test process directly.
 //!
 //! ## Concurrency

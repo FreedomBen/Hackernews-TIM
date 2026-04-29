@@ -1,4 +1,4 @@
-//! TEST_PLAN.md §3.3 — regression test that asserts no e2e request
+//! docs/planning/TEST_PLAN.md §3.3 — regression test that asserts no e2e request
 //! reaches a real production HN host (Linux-only).
 //!
 //! Phase 3 is built on the structural guarantee that the spawned

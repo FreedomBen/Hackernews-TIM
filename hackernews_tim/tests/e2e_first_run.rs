@@ -1,4 +1,4 @@
-//! TEST_PLAN.md §3.2.1 — first run with no config (Linux-only).
+//! docs/planning/TEST_PLAN.md §3.2.1 — first run with no config (Linux-only).
 //!
 //! Scenario:
 //!
@@ -22,7 +22,7 @@
 //! defined in `tests/e2e/mod.rs`; the failure is swallowed by the
 //! client (warn!'d and dropped), so the front page still renders.
 //! The cross-test no-production-host guarantee is asserted by
-//! `tests/e2e_no_real_network.rs` (TEST_PLAN.md §3.3).
+//! `tests/e2e_no_real_network.rs` (docs/planning/TEST_PLAN.md §3.3).
 
 #![cfg(target_os = "linux")]
 

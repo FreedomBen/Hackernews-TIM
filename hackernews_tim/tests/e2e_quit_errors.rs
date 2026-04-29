@@ -1,4 +1,4 @@
-//! TEST_PLAN.md §3.2.i — Quit + error / network-failure paths
+//! docs/planning/TEST_PLAN.md §3.2.i — Quit + error / network-failure paths
 //! (Linux-only). Covers scenarios 3.2.14 and 3.2.15.
 //!
 //! See [`e2e_first_run.rs`] for the surrounding harness conventions
@@ -132,7 +132,7 @@ fn front_page_http_500_surfaces_error_view() {
         "expected the wrapped error context on screen; saw:\n{screen}"
     );
 
-    // TEST_PLAN.md §3.2.15 acceptance: PTY-rendered error-view snapshot.
+    // docs/planning/TEST_PLAN.md §3.2.15 acceptance: PTY-rendered error-view snapshot.
     // The wiremock URL embeds a random port, so redact `127.0.0.1:<port>`
     // alongside the usual `\d+ \w+ ago` filter (the wrapping ureq error
     // also includes a status-code line that varies in trivial ways).

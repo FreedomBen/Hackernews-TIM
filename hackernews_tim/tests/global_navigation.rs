@@ -1,5 +1,5 @@
 //! Integration tests for global navigation + post-event hooks
-//! (TEST_PLAN.md Phase 2.2.6).
+//! (docs/planning/TEST_PLAN.md Phase 2.2.6).
 //!
 //! Drives the global keymap callbacks installed by
 //! [`set_up_global_callbacks`] through [`PuppetHarness`] over a

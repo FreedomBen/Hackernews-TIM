@@ -1,4 +1,4 @@
-//! TEST_PLAN.md §3.2.h — CLI flag scenarios (Linux-only). Covers
+//! docs/planning/TEST_PLAN.md §3.2.h — CLI flag scenarios (Linux-only). Covers
 //! scenarios 3.2.10–3.2.13 (`-i`, `--init-config`, `--update-theme`,
 //! `--migrate-auth`).
 //!
@@ -260,7 +260,7 @@ fn update_theme_dark_swaps_only_theme_table() {
 
     // Every other top-level key must equal what the light default
     // shipped with — that's the "all other tables are byte-identical"
-    // requirement from TEST_PLAN.md table 3.2.12, asserted via
+    // requirement from docs/planning/TEST_PLAN.md table 3.2.12, asserted via
     // structural equality so re-serialization of the dark theme block
     // doesn't trip a literal byte diff.
     let updated_table = updated_value.as_table().expect("toml root is a table");

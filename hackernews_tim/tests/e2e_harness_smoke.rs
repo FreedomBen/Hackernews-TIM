@@ -3,7 +3,7 @@
 //! Verifies that [`helpers::spawn_app`] can launch the debug binary,
 //! capture its PTY output via `vt100::Parser`, and observe a clean
 //! exit. Real user-flow scenarios live in sibling `tests/e2e_*.rs`
-//! files starting with TEST_PLAN.md §3.2.
+//! files starting with docs/planning/TEST_PLAN.md §3.2.
 //!
 //! On macOS / Windows this file compiles to an empty binary because of
 //! the `#![cfg(target_os = "linux")]` gate.

@@ -1,4 +1,4 @@
-//! Integration tests for `get_login_dialog` (TEST_PLAN.md Phase 2.2.5).
+//! Integration tests for `get_login_dialog` (docs/planning/TEST_PLAN.md Phase 2.2.5).
 //!
 //! Drives the dialog through [`PuppetHarness`] over a [`FakeHnApi`],
 //! using `call_on_name` to populate the username/password EditViews

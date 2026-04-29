@@ -7,7 +7,7 @@
 //! exercises the live HTTP layer rather than the `HnApi` /
 //! `FakeHnApi` trait double from Phase 2.
 //!
-//! See TEST_PLAN.md §3.1.2.
+//! See docs/planning/TEST_PLAN.md §3.1.2.
 
 #![cfg(target_os = "linux")]
 #![allow(dead_code)]

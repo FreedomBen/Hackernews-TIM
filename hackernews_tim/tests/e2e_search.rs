@@ -1,4 +1,4 @@
-//! TEST_PLAN.md §3.2.4 — search view workflow (Linux-only).
+//! docs/planning/TEST_PLAN.md §3.2.4 — search view workflow (Linux-only).
 //!
 //! Scenario:
 //!
@@ -163,7 +163,7 @@ fn search_view_opens_and_renders_typed_query_results() {
         "the typed query should be visible in the search bar; saw:\n{after_query}"
     );
 
-    // TEST_PLAN.md §3.2.4 acceptance: PTY-rendered search-view snapshot
+    // docs/planning/TEST_PLAN.md §3.2.4 acceptance: PTY-rendered search-view snapshot
     // with the typed query visible and both fixture hits in the results.
     insta::with_settings!({filters => vec![
         (r"\d+ \w+ ago", "[time ago]"),

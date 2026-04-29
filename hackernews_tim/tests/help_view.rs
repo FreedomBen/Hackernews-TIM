@@ -1,4 +1,4 @@
-//! Snapshot tests for the per-view [`HelpView`] dialogs (TEST_PLAN.md
+//! Snapshot tests for the per-view [`HelpView`] dialogs (docs/planning/TEST_PLAN.md
 //! Phase 2.2.5).
 //!
 //! Each parent view that supports the help dialog implements

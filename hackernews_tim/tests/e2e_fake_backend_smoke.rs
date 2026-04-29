@@ -12,7 +12,7 @@
 //!
 //! Single-test binary on purpose: `std::env::set_var` is process-
 //! global, so the e2e suite must run under `--test-threads=1` (per
-//! TEST_PLAN.md §3.1.4) and this binary must not contain other tests
+//! docs/planning/TEST_PLAN.md §3.1.4) and this binary must not contain other tests
 //! that race on the same env vars. macOS / Windows compile to an
 //! empty binary via the `cfg` gate.
 

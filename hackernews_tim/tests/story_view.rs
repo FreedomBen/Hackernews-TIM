@@ -1,4 +1,4 @@
-//! Integration tests for `StoryView` (TEST_PLAN.md Phase 2.2.1).
+//! Integration tests for `StoryView` (docs/planning/TEST_PLAN.md Phase 2.2.1).
 //!
 //! Builds a real `StoryView` over hand-built `Story` fixtures, drives
 //! it through [`hackernews_tim::test_support::PuppetHarness`], and
@@ -17,7 +17,7 @@
 //!
 //! Scenarios deferred to a follow-up commit (vote/login state,
 //! tag-cycle, find dialog UX) are tracked in the Phase 2.2.1 row of
-//! TEST_PLAN.md — they need background-thread orchestration the
+//! docs/planning/TEST_PLAN.md — they need background-thread orchestration the
 //! puppet harness can't yet drive deterministically.
 
 use std::collections::HashMap;

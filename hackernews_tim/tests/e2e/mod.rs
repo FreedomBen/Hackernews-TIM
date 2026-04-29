@@ -11,7 +11,7 @@
 //! mod helpers;
 //! ```
 //!
-//! See TEST_PLAN.md §3.1.1 for the surrounding plan.
+//! See docs/planning/TEST_PLAN.md §3.1.1 for the surrounding plan.
 
 #![cfg(target_os = "linux")]
 #![allow(dead_code)] // Helpers are shared across many e2e binaries; not all are used by every one.

@@ -1,4 +1,4 @@
-//! TEST_PLAN.md §3.2.6 — in-app login flow against a fake HN
+//! docs/planning/TEST_PLAN.md §3.2.6 — in-app login flow against a fake HN
 //! backend (Linux-only).
 //!
 //! Scenario:
@@ -137,7 +137,7 @@ fn login_dialog_succeeds_against_fake_backend() {
         .wait_for_text("Log in to Hacker News", DEFAULT_WAIT)
         .expect("login dialog title should appear");
 
-    // TEST_PLAN.md §3.2.6 acceptance: PTY-rendered login dialog snapshot
+    // docs/planning/TEST_PLAN.md §3.2.6 acceptance: PTY-rendered login dialog snapshot
     // — empty username/password fields, taken before any text is typed.
     // Brief sleep lets the dialog finish drawing before capture.
     std::thread::sleep(Duration::from_millis(150));

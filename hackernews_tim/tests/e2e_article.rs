@@ -1,4 +1,4 @@
-//! TEST_PLAN.md §3.2.5 — article view + reader mode + link dialog
+//! docs/planning/TEST_PLAN.md §3.2.5 — article view + reader mode + link dialog
 //! (Linux-only).
 //!
 //! Scenario:
@@ -228,7 +228,7 @@ fn article_view_renders_and_link_dialog_picks_url_open_command() {
         .wait_for_text(ARTICLE_TITLE, ARTICLE_RENDER_TIMEOUT)
         .expect("article title from the article-parse stub should render");
 
-    // TEST_PLAN.md §3.2.5 acceptance: PTY-rendered article view snapshot.
+    // docs/planning/TEST_PLAN.md §3.2.5 acceptance: PTY-rendered article view snapshot.
     // Allow a beat for the async-view loading frame to be replaced by
     // the parsed body before the snapshot is taken.
     std::thread::sleep(Duration::from_millis(150));
@@ -248,7 +248,7 @@ fn article_view_renders_and_link_dialog_picks_url_open_command() {
         .wait_for_text(&dialog_needle, DEFAULT_WAIT)
         .expect("link dialog should enumerate both fixture links");
 
-    // TEST_PLAN.md §3.2.5 acceptance: PTY-rendered link-dialog snapshot.
+    // docs/planning/TEST_PLAN.md §3.2.5 acceptance: PTY-rendered link-dialog snapshot.
     insta::with_settings!({filters => vec![
         (r"\d+ \w+ ago", "[time ago]"),
     ]}, {

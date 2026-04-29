@@ -32,7 +32,7 @@ const HN_LISTING_PAGE_SIZE: usize = 30;
 
 /// Read the Algolia / Firebase / news.ycombinator.com base URLs,
 /// applying the e2e-only `HN_ALGOLIA_BASE`, `HN_FIREBASE_BASE`, and
-/// `HN_NEWS_BASE` env-var overrides (TEST_PLAN.md §3.1.2). All three
+/// `HN_NEWS_BASE` env-var overrides (docs/planning/TEST_PLAN.md §3.1.2). All three
 /// fall back to the production constants. Values are stored as
 /// instance fields on [`HNClient`] so a single binary can't split
 /// requests between an override and the real host.

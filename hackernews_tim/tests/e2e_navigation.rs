@@ -1,4 +1,4 @@
-//! TEST_PLAN.md §3.2.b — front-page navigation and comment view
+//! docs/planning/TEST_PLAN.md §3.2.b — front-page navigation and comment view
 //! drilldown (Linux-only). Covers scenarios 3.2.2 and 3.2.3.
 //!
 //! See [`e2e_first_run.rs`] for the surrounding harness conventions
@@ -121,7 +121,7 @@ fn front_page_navigates_with_j_k_and_ctrl_d() {
         );
     }
 
-    // TEST_PLAN.md §3.2.2 acceptance: PTY-rendered front-page snapshot.
+    // docs/planning/TEST_PLAN.md §3.2.2 acceptance: PTY-rendered front-page snapshot.
     // Filter "X units ago" since `created_at_i` is a fixed epoch but the
     // displayed offset drifts as wall-clock time advances.
     insta::with_settings!({filters => vec![
@@ -275,7 +275,7 @@ fn drill_into_comments_and_back_to_front_page() {
     // initial draw and gets swallowed.
     std::thread::sleep(Duration::from_millis(200));
 
-    // TEST_PLAN.md §3.2.3 acceptance: PTY-rendered comment-view snapshot.
+    // docs/planning/TEST_PLAN.md §3.2.3 acceptance: PTY-rendered comment-view snapshot.
     // Same time filter as the front-page snapshot — the fixture has a
     // fixed `time` epoch but the relative offset drifts.
     insta::with_settings!({filters => vec![

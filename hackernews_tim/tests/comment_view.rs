@@ -1,4 +1,4 @@
-//! Integration tests for `CommentView` (TEST_PLAN.md Phase 2.2.2).
+//! Integration tests for `CommentView` (docs/planning/TEST_PLAN.md Phase 2.2.2).
 //!
 //! Drives a real `CommentView` over a hand-built comment tree fed
 //! through the `crossbeam_channel` that backs `PageData`. The view's

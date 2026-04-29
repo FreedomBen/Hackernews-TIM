@@ -1,5 +1,5 @@
 //! End-to-end integration tests for the find-on-page dialog
-//! (`view::find_bar`) driven through a `StoryView` host (TEST_PLAN.md
+//! (`view::find_bar`) driven through a `StoryView` host (docs/planning/TEST_PLAN.md
 //! Phase 2.2.5).
 //!
 //! These tests exercise the dialog *UI*: opening with `/`, typing

@@ -1,4 +1,4 @@
-//! Integration tests for `LinkDialog` (TEST_PLAN.md Phase 2.2.5).
+//! Integration tests for `LinkDialog` (docs/planning/TEST_PLAN.md Phase 2.2.5).
 //!
 //! Builds the dialog over a fixed list of fixture links via
 //! [`construct_link_dialog_main_view`] (the resize-wrapped public

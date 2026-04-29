@@ -1,4 +1,4 @@
-//! Integration tests for `ArticleView` (TEST_PLAN.md Phase 2.2.4).
+//! Integration tests for `ArticleView` (docs/planning/TEST_PLAN.md Phase 2.2.4).
 //!
 //! Builds an `ArticleView` over an in-memory [`Article`] (no network),
 //! drives it through [`PuppetHarness`], and asserts on rendered output,

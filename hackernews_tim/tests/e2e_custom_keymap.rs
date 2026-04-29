@@ -1,4 +1,4 @@
-//! TEST_PLAN.md §3.2.9 — custom keymap from TOML (Linux-only).
+//! docs/planning/TEST_PLAN.md §3.2.9 — custom keymap from TOML (Linux-only).
 //!
 //! Pre-write a config TOML with a `[[keymap.custom_keymaps]]` block
 //! bound to `Z`, `tag = "ask_hn"`, `by_date = false`. The binary

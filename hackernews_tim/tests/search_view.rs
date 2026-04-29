@@ -1,4 +1,4 @@
-//! Integration tests for `SearchView` (TEST_PLAN.md Phase 2.2.3).
+//! Integration tests for `SearchView` (docs/planning/TEST_PLAN.md Phase 2.2.3).
 //!
 //! Builds a real `SearchView` over [`FakeHnApi`], drives it through
 //! [`PuppetHarness`], and asserts on rendered output, query/mode

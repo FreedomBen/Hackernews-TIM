@@ -70,7 +70,7 @@ authoritative test names.
 - [x] 3.2.d Article view + reader mode + link dialog (table 3.2.5)
 - [x] 3.2.e Login flow against fake backend (table 3.2.6)
 - [x] 3.2.f Vote / reply happy paths (table 3.2.7–3.2.8)
-- [ ] 3.2.g Custom keymap from TOML (table 3.2.9)
+- [x] 3.2.g Custom keymap from TOML (table 3.2.9)
 - [ ] 3.2.h CLI flags `-i`, `--init-config`, `--update-theme`, `--migrate-auth` (table 3.2.10–3.2.13)
 - [ ] 3.2.i Quit + error / network-failure paths (table 3.2.14–3.2.15)
 - [ ] 3.3 Fixture and harness discipline (per-test temp HOME, env-var backend, snapshot review)

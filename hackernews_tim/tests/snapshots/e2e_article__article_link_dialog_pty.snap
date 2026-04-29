@@ -1,0 +1,44 @@
+---
+source: hackernews_tim/tests/e2e_article.rs
+expression: handle.screen()
+---
+[Y] Hacker News | 1.front_page | 2.story | 3.ask_hn | 4.show_hn | 5.job | 6.threads | search (^S) |
+                                        Article View - Phase 3 reader mode title
+                                               Phase 3 reader mode title
+                                     by: Article Author, date_published: 2026-01-01
+
+ Reader mode body paragraph alpha.
+
+ Body paragraph beta with first anchor [1] and second anchor [2].
+
+
+
+
+
+
+
+
+
+
+                            ┌──────────────────────────────────────────────────────────────┐
+                            │ 1. http://example.test/link-one                              │
+                            │ 2. http://example.test/link-two                              │
+                            └──────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                            Hacker News Terminal UI - made by AOME ©                            [?: help] [back] [quit]

@@ -203,3 +203,79 @@ fn init_config_dark_writes_embedded_dark_default() {
         path.display()
     );
 }
+
+// =====================================================================
+// 3.2.12 — `--update-theme dark`
+// =====================================================================
+
+#[test]
+fn update_theme_dark_swaps_only_theme_table() {
+    let dirs = TestDirs::new().expect("TestDirs::new");
+    let config_path = dirs
+        .xdg_config_home
+        .join("hackernews-tim")
+        .join("config.toml");
+    std::fs::create_dir_all(config_path.parent().unwrap()).expect("create config dir");
+
+    // Seed with the embedded light default. The post-update file
+    // should retain every non-`[theme]` table from this seed
+    // unchanged, with `[theme]` swapped for the dark version.
+    std::fs::write(&config_path, EMBEDDED_LIGHT_CONFIG).expect("seed light config");
+
+    let opts = SpawnOptions::new()
+        .arg("--update-theme")
+        .arg("dark")
+        .dirs(dirs);
+    let mut handle = spawn_app(opts).expect("spawn_app should succeed");
+
+    handle
+        .wait_for_text("Updated dark theme in", Duration::from_secs(10))
+        .expect("binary should announce the theme update");
+
+    let status = handle
+        .wait_for_exit(Duration::from_secs(5))
+        .expect("binary should exit on its own after updating the theme");
+    assert!(
+        status.success(),
+        "--update-theme dark should exit 0; got {status:?}"
+    );
+
+    let updated = std::fs::read_to_string(&config_path).expect("updated config readable");
+    let updated_value: toml::Value =
+        toml::from_str(&updated).expect("updated config should parse as TOML");
+    let light_value: toml::Value =
+        toml::from_str(EMBEDDED_LIGHT_CONFIG).expect("light default should parse as TOML");
+    let dark_value: toml::Value =
+        toml::from_str(EMBEDDED_DARK_CONFIG).expect("dark default should parse as TOML");
+
+    // The new `[theme]` table must match the embedded dark default's.
+    assert_eq!(
+        updated_value.get("theme"),
+        dark_value.get("theme"),
+        "[theme] table should be the dark default after --update-theme dark"
+    );
+
+    // Every other top-level key must equal what the light default
+    // shipped with — that's the "all other tables are byte-identical"
+    // requirement from TEST_PLAN.md table 3.2.12, asserted via
+    // structural equality so re-serialization of the dark theme block
+    // doesn't trip a literal byte diff.
+    let updated_table = updated_value.as_table().expect("toml root is a table");
+    let light_table = light_value.as_table().expect("light root is a table");
+    for (key, value) in light_table {
+        if key == "theme" {
+            continue;
+        }
+        assert_eq!(
+            updated_table.get(key),
+            Some(value),
+            "non-theme top-level key '{key}' should be preserved verbatim"
+        );
+    }
+    for key in updated_table.keys() {
+        assert!(
+            light_table.contains_key(key),
+            "unexpected new top-level key '{key}' after --update-theme"
+        );
+    }
+}

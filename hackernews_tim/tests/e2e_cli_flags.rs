@@ -16,7 +16,10 @@ use std::time::Duration;
 use serde_json::json;
 
 use helpers::fakehn::FakeHnServer;
+use helpers::keyring::{clear_mock_keyring, init_mock_keyring};
 use helpers::{spawn_app, AppHandle, SpawnOptions, TestDirs, DEFAULT_WAIT};
+
+use hackernews_tim::config::{self, Auth, AuthStorage, MigrationOutcome, KEYRING_SERVICE};
 
 const FRONT_PAGE_RENDER_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -278,4 +281,233 @@ fn update_theme_dark_swaps_only_theme_table() {
             "unexpected new top-level key '{key}' after --update-theme"
         );
     }
+}
+
+// =====================================================================
+// 3.2.13 — `--migrate-auth file` ↔ `--migrate-auth keyring`
+// =====================================================================
+//
+// The keyring round-trip is exercised in-process (`config::migrate_auth`
+// directly), since `keyring::set_default_credential_builder` mutates a
+// process-global slot that does not propagate to children spawned via
+// `spawn_app` (see `helpers::keyring` for the rationale). The
+// spawned-binary side is covered by a NoOp scenario that only touches
+// the file backend, which proves the CLI plumbing — argument parsing,
+// success line, exit code — without needing the keyring at all.
+
+const MIGRATE_USERNAME: &str = "migrate_user";
+const MIGRATE_PASSWORD: &str = "hunter2";
+const MIGRATE_SESSION: &str = "migrate_user&abcdef0123";
+
+fn keyring_password_account(username: &str) -> String {
+    username.to_string()
+}
+
+fn keyring_session_account(username: &str) -> String {
+    format!("{username}:session")
+}
+
+fn seed_file_backed_auth(path: &std::path::Path) {
+    std::fs::create_dir_all(path.parent().unwrap()).expect("create auth dir");
+    Auth {
+        username: MIGRATE_USERNAME.to_string(),
+        password: MIGRATE_PASSWORD.to_string(),
+        session: Some(MIGRATE_SESSION.to_string()),
+        storage: AuthStorage::File,
+    }
+    .write_to_file(path)
+    .expect("seed file-backed auth");
+}
+
+#[test]
+fn migrate_auth_round_trips_file_keyring_file() {
+    init_mock_keyring();
+    // The stateful mock store survives across tests in the same
+    // binary (the `keyring` default-builder slot is process-global);
+    // start each run with an empty slate.
+    clear_mock_keyring();
+
+    let dirs = TestDirs::new().expect("TestDirs::new");
+    let auth_path = dirs
+        .xdg_config_home
+        .join("hackernews-tim")
+        .join("hn-auth.toml");
+
+    seed_file_backed_auth(&auth_path);
+
+    // --- File → Keyring ---------------------------------------------
+    let outcome =
+        config::migrate_auth(&auth_path, AuthStorage::Keyring).expect("migrate to keyring");
+    assert!(
+        matches!(
+            outcome,
+            MigrationOutcome::Migrated {
+                from: AuthStorage::File,
+                to: AuthStorage::Keyring,
+            }
+        ),
+        "expected Migrated File → Keyring; got {outcome:?}"
+    );
+
+    // The file should now be a pointer (no plaintext password).
+    let pointer_text = std::fs::read_to_string(&auth_path).expect("read pointer file");
+    let pointer: toml::Value = toml::from_str(&pointer_text).expect("pointer parses as TOML");
+    assert_eq!(
+        pointer.get("storage").and_then(|v| v.as_str()),
+        Some("keyring"),
+        "pointer should declare keyring storage; full file:\n{pointer_text}"
+    );
+    assert_eq!(
+        pointer.get("username").and_then(|v| v.as_str()),
+        Some(MIGRATE_USERNAME),
+        "pointer should carry the username; full file:\n{pointer_text}"
+    );
+    assert!(
+        pointer.get("password").is_none(),
+        "keyring pointer must not contain a plaintext password; saw:\n{pointer_text}"
+    );
+
+    // The keyring should hold both the password and session under the
+    // documented service / account names.
+    let pw_entry =
+        ::keyring::Entry::new(KEYRING_SERVICE, &keyring_password_account(MIGRATE_USERNAME))
+            .expect("password Entry");
+    assert_eq!(
+        pw_entry.get_password().expect("get password from keyring"),
+        MIGRATE_PASSWORD,
+    );
+    let session_entry =
+        ::keyring::Entry::new(KEYRING_SERVICE, &keyring_session_account(MIGRATE_USERNAME))
+            .expect("session Entry");
+    assert_eq!(
+        session_entry
+            .get_password()
+            .expect("get session from keyring"),
+        MIGRATE_SESSION,
+    );
+
+    // --- Keyring → Keyring (NoOp) ----------------------------------
+    let outcome =
+        config::migrate_auth(&auth_path, AuthStorage::Keyring).expect("noop migrate to keyring");
+    assert!(
+        matches!(
+            outcome,
+            MigrationOutcome::NoOp {
+                storage: AuthStorage::Keyring,
+            }
+        ),
+        "second migrate to keyring should be a NoOp; got {outcome:?}"
+    );
+
+    // --- Keyring → File --------------------------------------------
+    let outcome =
+        config::migrate_auth(&auth_path, AuthStorage::File).expect("migrate back to file");
+    assert!(
+        matches!(
+            outcome,
+            MigrationOutcome::Migrated {
+                from: AuthStorage::Keyring,
+                to: AuthStorage::File,
+            }
+        ),
+        "expected Migrated Keyring → File; got {outcome:?}"
+    );
+
+    let restored_text = std::fs::read_to_string(&auth_path).expect("read restored file");
+    let restored: toml::Value = toml::from_str(&restored_text).expect("restored parses as TOML");
+    assert_eq!(
+        restored.get("username").and_then(|v| v.as_str()),
+        Some(MIGRATE_USERNAME),
+    );
+    assert_eq!(
+        restored.get("password").and_then(|v| v.as_str()),
+        Some(MIGRATE_PASSWORD),
+        "restored file must contain plaintext password; saw:\n{restored_text}"
+    );
+    assert_eq!(
+        restored.get("session").and_then(|v| v.as_str()),
+        Some(MIGRATE_SESSION),
+    );
+    // `storage` defaults to File; the writer either omits it or writes
+    // "file". Accept either to avoid coupling the test to formatting.
+    let storage_value = restored.get("storage").and_then(|v| v.as_str());
+    assert!(
+        matches!(storage_value, None | Some("file")),
+        "restored file should declare file storage (or omit it); saw {storage_value:?}"
+    );
+
+    // Keyring entries should be cleaned up — `get_password` errors on
+    // a deleted credential under the mock backend.
+    let pw_entry =
+        ::keyring::Entry::new(KEYRING_SERVICE, &keyring_password_account(MIGRATE_USERNAME))
+            .expect("password Entry post-migrate");
+    assert!(
+        pw_entry.get_password().is_err(),
+        "keyring password should be cleared after migrating back to file"
+    );
+    let session_entry =
+        ::keyring::Entry::new(KEYRING_SERVICE, &keyring_session_account(MIGRATE_USERNAME))
+            .expect("session Entry post-migrate");
+    assert!(
+        session_entry.get_password().is_err(),
+        "keyring session should be cleared after migrating back to file"
+    );
+
+    // --- File → File (NoOp) ----------------------------------------
+    let outcome =
+        config::migrate_auth(&auth_path, AuthStorage::File).expect("noop migrate to file");
+    assert!(
+        matches!(
+            outcome,
+            MigrationOutcome::NoOp {
+                storage: AuthStorage::File,
+            }
+        ),
+        "second migrate to file should be a NoOp; got {outcome:?}"
+    );
+}
+
+#[test]
+fn migrate_auth_file_to_file_via_binary_prints_noop() {
+    let dirs = TestDirs::new().expect("TestDirs::new");
+    let auth_path = dirs
+        .xdg_config_home
+        .join("hackernews-tim")
+        .join("hn-auth.toml");
+    seed_file_backed_auth(&auth_path);
+    let pre_text = std::fs::read_to_string(&auth_path).expect("read seeded auth");
+
+    // Pre-write an empty config to skip `prompt_for_flavor` — though
+    // the `--migrate-auth` branch exits before the flavor prompt, the
+    // safety net keeps the test independent of that ordering.
+    pre_write_default_config(&dirs);
+
+    let opts = SpawnOptions::new()
+        .arg("--migrate-auth")
+        .arg("file")
+        .dirs(dirs);
+    let mut handle = spawn_app(opts).expect("spawn_app should succeed");
+
+    handle
+        .wait_for_text(
+            "is already using file storage; nothing to migrate.",
+            Duration::from_secs(10),
+        )
+        .expect("binary should print the NoOp message");
+
+    let status = handle
+        .wait_for_exit(Duration::from_secs(5))
+        .expect("binary should exit on its own after the NoOp branch");
+    assert!(
+        status.success(),
+        "--migrate-auth file (already file) should exit 0; got {status:?}"
+    );
+
+    // The auth file should be byte-identical — a NoOp must not rewrite
+    // the file on disk.
+    let post_text = std::fs::read_to_string(&auth_path).expect("read auth post-NoOp");
+    assert_eq!(
+        post_text, pre_text,
+        "NoOp migrate must not modify the auth file"
+    );
 }

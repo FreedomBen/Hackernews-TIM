@@ -13,6 +13,11 @@
 //! to the fake server. The auth token is recovered from a hand-built
 //! `<a id='up_<id>' ... auth=<token>>` anchor served at `/item`,
 //! matching the regex in `parse_vote_data_from_content`.
+//!
+//! 3.2.8: press the reply key, then a stub editor (passed via
+//! `VISUAL`) overwrites the scaffold with a fixed body. Assert the
+//! binary's resulting `POST /comment` carries `parent`, `hmac`,
+//! `goto`, and `text` matching the form scraped from `/item`.
 
 #![cfg(target_os = "linux")]
 
@@ -32,9 +37,12 @@ const FIXTURE_USERNAME: &str = "alice";
 const FIXTURE_PASSWORD: &str = "hunter2";
 const FIXTURE_SESSION: &str = "alice&deadbeef0123";
 const FIXTURE_AUTH_TOKEN: &str = "abc123def";
+const FIXTURE_HMAC: &str = "rephmac1";
+const REPLY_BODY: &str = "Test reply body";
 
 const FRONT_PAGE_RENDER_TIMEOUT: Duration = Duration::from_secs(60);
 const VOTE_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+const REPLY_POST_TIMEOUT: Duration = Duration::from_secs(15);
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 /// Drop a minimal config TOML at the resolved `--config` path so
@@ -128,6 +136,43 @@ fn mount_vote_endpoint(server: &FakeHnServer) {
     server.mount_get_text("/vote", 200, "");
 }
 
+/// Mount `/item` returning HTML containing both a vote-data anchor
+/// (so `parse_vote_data_from_content` resolves an auth token) AND a
+/// reply form with a hidden `hmac` input that `parse_reply_form`
+/// scrapes via `extract_hidden_input`. Used by §3.2.8 — the binary
+/// fetches `/item` once for the hmac before POSTing `/comment`, and
+/// again when Cursive re-opens the comment view after `wait_for_enter`.
+fn mount_item_with_reply_form(server: &FakeHnServer) {
+    let html = format!(
+        "<html><body>\n\
+         <a href=\"logout?goto=news&amp;auth=zzz\">logout</a>\n\
+         <a id='up_{STORY_ID}' href='vote?id={STORY_ID}&amp;how=up&amp;auth={FIXTURE_AUTH_TOKEN}'>up</a>\n\
+         <form action=\"comment\" method=\"post\">\n\
+         <input type=\"hidden\" name=\"parent\" value=\"{STORY_ID}\">\n\
+         <input type=\"hidden\" name=\"goto\" value=\"item?id={STORY_ID}\">\n\
+         <input type=\"hidden\" name=\"hmac\" value=\"{FIXTURE_HMAC}\">\n\
+         <textarea name=\"text\"></textarea>\n\
+         </form>\n\
+         </body></html>"
+    );
+    server.mount_get_text("/item", 200, html);
+}
+
+/// Mount `/comment` so `post_reply`'s POST gets a body that
+/// `classify_post_reply_response` treats as success (none of the
+/// HN error markers present).
+fn mount_comment_endpoint(server: &FakeHnServer) {
+    server.mount_post_text("/comment", 200, "<html><body>posted</body></html>");
+}
+
+/// Resolve the absolute path to the stub editor checked into the
+/// repo at `tests/e2e/scripts/reply_stub.sh`. Cargo runs tests with
+/// `CARGO_MANIFEST_DIR` set to the crate root, so this works from
+/// any CWD.
+fn reply_stub_path() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/e2e/scripts/reply_stub.sh")
+}
+
 #[test]
 fn vote_happy_path_sends_get_to_vote_endpoint() {
     let server = FakeHnServer::start();
@@ -194,6 +239,96 @@ fn vote_happy_path_sends_get_to_vote_endpoint() {
     assert!(
         query.contains(&format!("auth={FIXTURE_AUTH_TOKEN}")),
         "vote URL should carry auth={FIXTURE_AUTH_TOKEN}; saw query: {query:?}"
+    );
+
+    let status = handle.shutdown().expect("clean exit");
+    assert!(status.success(), "expected success exit, got {status:?}");
+}
+
+#[test]
+fn reply_happy_path_posts_to_comment_endpoint() {
+    let server = FakeHnServer::start();
+    mount_front_page(&server);
+    mount_item_with_reply_form(&server);
+    mount_comment_endpoint(&server);
+
+    let stub = reply_stub_path();
+    assert!(
+        stub.exists(),
+        "stub editor script missing at {} — `tests/e2e/scripts/reply_stub.sh` must be checked in with the +x bit set",
+        stub.display()
+    );
+
+    let dirs = TestDirs::new().expect("TestDirs::new");
+    write_test_config(&dirs);
+    write_test_auth(&dirs);
+
+    let opts = SpawnOptions::new()
+        .algolia_base(server.algolia_base())
+        .firebase_base(server.firebase_base())
+        .news_base(server.news_base())
+        .env("VISUAL", &stub)
+        .dirs(dirs);
+    let mut handle = spawn_app(opts).expect("spawn_app");
+
+    handle
+        .wait_for_text(STORY_TITLE, FRONT_PAGE_RENDER_TIMEOUT)
+        .expect("front-page fixture should render");
+
+    // Sleep mirrors the post-render race avoidance in §3.2.6 / §3.2.7.
+    std::thread::sleep(Duration::from_millis(200));
+    handle
+        .send_keys("r")
+        .expect("send r (default story-view reply keybinding)");
+
+    // Cursive quits, the stub editor runs, post_reply succeeds, and
+    // main prints the success line before blocking on wait_for_enter.
+    handle
+        .wait_for_text(
+            &format!("Reply posted to item {STORY_ID}"),
+            REPLY_POST_TIMEOUT,
+        )
+        .expect("binary should announce a successful reply");
+
+    // Dismiss wait_for_enter; binary re-opens Cursive at the
+    // comment view (we don't assert on its render — the §3.2.8
+    // contract is the POST itself).
+    handle.send_keys("\n").expect("dismiss wait_for_enter");
+
+    // Inspect the recorded /comment POST. Body is form-urlencoded:
+    // "Test reply body" → "Test+reply+body".
+    let requests = server.received_requests();
+    let comment_posts: Vec<_> = requests
+        .iter()
+        .filter(|r| r.method.as_str() == "POST" && r.url.path() == "/comment")
+        .collect();
+    assert_eq!(
+        comment_posts.len(),
+        1,
+        "expected exactly one POST /comment; observed: {:?}",
+        requests
+            .iter()
+            .map(|r| format!("{} {}", r.method, r.url.path()))
+            .collect::<Vec<_>>()
+    );
+    let body = std::str::from_utf8(&comment_posts[0].body).expect("/comment body should be UTF-8");
+    assert!(
+        body.contains(&format!("parent={STORY_ID}")),
+        "POST /comment should carry parent={STORY_ID}; saw body: {body:?}"
+    );
+    assert!(
+        body.contains(&format!("hmac={FIXTURE_HMAC}")),
+        "POST /comment should carry hmac={FIXTURE_HMAC}; saw body: {body:?}"
+    );
+    assert!(
+        body.contains("goto=item"),
+        "POST /comment should carry goto=item?id=...; saw body: {body:?}"
+    );
+    // ureq's `send_form` percent-encodes spaces as `+`.
+    let encoded_body = REPLY_BODY.replace(' ', "+");
+    assert!(
+        body.contains(&format!("text={encoded_body}")),
+        "POST /comment should carry text={encoded_body:?}; saw body: {body:?}"
     );
 
     let status = handle.shutdown().expect("clean exit");

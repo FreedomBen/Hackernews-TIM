@@ -163,6 +163,14 @@ fn search_view_opens_and_renders_typed_query_results() {
         "the typed query should be visible in the search bar; saw:\n{after_query}"
     );
 
+    // TEST_PLAN.md §3.2.4 acceptance: PTY-rendered search-view snapshot
+    // with the typed query visible and both fixture hits in the results.
+    insta::with_settings!({filters => vec![
+        (r"\d+ \w+ ago", "[time ago]"),
+    ]}, {
+        insta::assert_snapshot!("search_view_with_results_pty", after_query);
+    });
+
     // Esc — `to_navigation_mode` (SearchViewKeyMap default). After the
     // switch, character keys should no longer feed the search bar; they
     // route to the inner StoryView (where they're either bound — `j`/`k`
